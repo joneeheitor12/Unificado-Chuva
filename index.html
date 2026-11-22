@@ -2,303 +2,779 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerador de Report Diário - Linha de Infiltração</title>
-    <!-- Biblioteca SheetJS para manipulação de Excel (.xlsx) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sistema Unificado Qualidade & Infiltração | Cloud Realtime</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    
-    <!-- Firebase SDKs (Compat Version para uso direto em HTML/CDN) -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <style>
         :root {
             --bg-primary: #0b1329;
             --bg-card: #111c38;
-            --bg-input: #1e293b;
+            --bg-input: #1a2642;
+            --bg-subpanel: rgba(15, 23, 42, 0.55);
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
-            --accent-green: #059669;
-            --accent-blue: #2563eb;
-            --accent-amber: #d97706;
-            --border-color: #334155;
-            --radius-lg: 12px;
-            --radius-md: 8px;
-            --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-amber: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-purple: #8b5cf6;
+            --border-color: #2c3b5e;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { background-color: var(--bg-primary); color: var(--text-main); padding: 30px 20px; min-height: 100vh; }
-        
-        .header { max-width: 1280px; margin: 0 auto 24px auto; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; flex-wrap: wrap; gap: 15px; }
-        .header h1 { font-size: 1.6rem; font-weight: 700; color: var(--text-main); letter-spacing: -0.5px; }
-        .header .subtitle { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; display: flex; align-items: center; gap: 10px; }
-        
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background-color: var(--bg-primary); color: var(--text-main); padding: 18px 12px; min-height: 100vh; }
+
+        .global-header {
+            max-width: 1280px; margin: 0 auto 16px auto; background: var(--bg-card);
+            border: 1px solid var(--border-color); border-radius: 12px; padding: 16px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            flex-wrap: wrap; gap: 14px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.35);
+        }
+        .global-title h1 { font-size: 1.35rem; font-weight: 800; color: #fff; }
+        .global-title p { font-size: 0.82rem; color: var(--text-muted); margin-top: 3px; }
+
+        .global-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .date-box {
+            display: flex; align-items: center; gap: 8px; background: var(--bg-input);
+            padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border-color);
+        }
+        .date-box label { font-size: 0.78rem; color: var(--accent-amber); font-weight: 700; text-transform: uppercase; margin: 0; }
+        .date-box input[type="date"] {
+            background: transparent; border: none; color: #fff;
+            font-weight: 700; font-size: 0.9rem; outline: none; cursor: pointer;
+        }
+
+        .cloud-badges { display: flex; gap: 6px; flex-wrap: wrap; }
         .status-cloud {
+            display: inline-flex; align-items: center; gap: 4px;
+            background: rgba(16, 185, 129, 0.14); color: var(--accent-green);
+            padding: 4px 10px; border-radius: 20px; font-size: 0.72rem;
+            font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.45);
+        }
+        .status-cloud.syncing { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border-color: rgba(245, 158, 11, 0.5); }
+        .status-cloud.offline { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); border-color: rgba(239, 68, 68, 0.5); }
+
+        .main-nav {
+            max-width: 1280px; margin: 0 auto 20px auto;
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+        }
+        @media (max-width: 768px) { .main-nav { grid-template-columns: 1fr; } }
+        .main-tab-btn {
+            background: var(--bg-card); color: var(--text-muted);
+            border: 2px solid var(--border-color); padding: 14px 16px;
+            border-radius: 10px; font-size: 0.95rem; font-weight: 700;
+            cursor: pointer; transition: all 0.2s; display: flex;
+            align-items: center; justify-content: center; gap: 8px;
+        }
+        .main-tab-btn:hover { border-color: var(--accent-blue); color: #fff; }
+        .main-tab-btn.active {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #fff; border-color: #60a5fa;
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+        }
+
+        .module-section { display: none; max-width: 1280px; margin: 0 auto; }
+        .module-section.active { display: block; }
+
+        .sub-nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+        .sub-tab-btn {
+            background: var(--bg-card); color: var(--text-muted);
+            border: 1px solid var(--border-color); padding: 9px 16px;
+            border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer;
+        }
+        .sub-tab-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+
+        .grid-2 { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 20px; }
+        @media (max-width: 960px) { .grid-2 { grid-template-columns: 1fr; } }
+
+        .card {
+            background-color: var(--bg-card); border-radius: 12px; padding: 18px;
+            border: 1px solid var(--border-color); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.25);
+            margin-bottom: 16px;
+        }
+        .card-title {
+            font-size: 1.02rem; font-weight: 700; margin-bottom: 14px;
+            color: #fff; border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px; display: flex; justify-content: space-between;
+            align-items: center; gap: 8px; flex-wrap: wrap;
+        }
+
+        /* Blocos organizados da Produção Diária */
+        .metric-group-box {
+            background: var(--bg-subpanel);
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            border-radius: 10px;
+            padding: 13px 14px;
+            margin-bottom: 12px;
+        }
+        .metric-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 0.73rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #cbd5e1;
+        }
+        .ftt-live-pill {
+            background: rgba(16, 185, 129, 0.14);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            padding: 2px 9px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+        }
+        .auto-field-card {
+            background: rgba(17, 28, 56, 0.75);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .auto-footer-row {
+            margin-top: 7px;
+            padding-top: 6px;
+            border-top: 1px dashed rgba(148, 163, 184, 0.18);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+        .auto-badge-text {
+            font-size: 0.71rem;
+            font-weight: 600;
+            color: var(--accent-green);
             display: inline-flex;
             align-items: center;
+            gap: 4px;
+        }
+
+        .form-group { margin-bottom: 10px; }
+        .form-group:last-child { margin-bottom: 0; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        @media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
+        .form-row-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        @media (max-width: 600px) { .form-row-4 { grid-template-columns: 1fr 1fr; } }
+
+        label {
+            display: flex;
+            align-items: center;
             gap: 5px;
-            background: rgba(5, 150, 105, 0.15);
+            font-size: 0.74rem;
+            color: #cbd5e1;
+            margin-bottom: 5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        input[type="text"], input[type="number"], input[type="date"], select {
+            width: 100%; padding: 9px 12px; background-color: var(--bg-input);
+            border: 1px solid var(--border-color); border-radius: 7px;
+            color: #ffffff; font-size: 0.92rem; outline: none;
+            font-variant-numeric: tabular-nums;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        input:focus, select:focus {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+        }
+
+        .btn-sync-mini {
+            background: rgba(16, 185, 129, 0.14);
             color: var(--accent-green);
-            padding: 2px 8px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: bold;
-            border: 1px solid var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.45);
+            border-radius: 5px;
+            padding: 3px 8px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s ease;
         }
-        .status-cloud.syncing {
-            background: rgba(217, 119, 6, 0.15);
-            color: var(--accent-amber);
-            border-color: var(--accent-amber);
-        }
-        .status-cloud.offline {
-            background: rgba(220, 38, 38, 0.15);
-            color: #ef4444;
-            border-color: #ef4444;
+        .btn-sync-mini:hover { background: rgba(16, 185, 129, 0.25); }
+
+        .section-subtitle {
+            font-size: 0.8rem; font-weight: 700; color: var(--accent-amber);
+            margin: 16px 0 8px 0; text-transform: uppercase;
+            border-left: 3px solid var(--accent-amber); padding-left: 8px;
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;
         }
 
-        .date-selector-box { display: flex; align-items: center; gap: 12px; background: var(--bg-card); padding: 10px 18px; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        .date-selector-box label { font-size: 0.8rem; color: var(--accent-amber); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-        .date-selector-box input[type="date"] { background: var(--bg-input); color: #fff; border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 6px; font-size: 0.9rem; cursor: pointer; font-weight: 600; outline: none; }
+        .btn-tool {
+            padding: 8px 13px; border: none; border-radius: 7px;
+            font-size: 0.8rem; font-weight: 700; cursor: pointer;
+            display: inline-flex; align-items: center; gap: 5px; color: #fff;
+        }
+        .btn-green { background-color: var(--accent-green); color: #000; }
+        .btn-blue { background-color: var(--accent-blue); }
+        .btn-amber { background-color: var(--accent-amber); color: #000; }
+        .btn-red { background-color: var(--accent-red); }
+        .btn-purple { background-color: var(--accent-purple); }
+        .btn-full { width: 100%; justify-content: center; padding: 11px; font-size: 0.9rem; margin-top: 10px; }
 
-        .nav-tabs { max-width: 1280px; margin: 0 auto 24px auto; display: flex; gap: 10px; flex-wrap: wrap; }
-        .tab-btn { background-color: var(--bg-card); color: var(--text-muted); border: 1px solid var(--border-color); padding: 12px 22px; border-radius: var(--radius-md); font-weight: 600; cursor: pointer; transition: all 0.2s ease; font-size: 0.9rem; }
-        .tab-btn:hover { border-color: var(--text-muted); color: #fff; }
-        .tab-btn.active { background-color: var(--accent-blue); color: #fff; border-color: var(--accent-blue); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
+        .preview-box {
+            background-color: #070d1d; border-radius: 8px; padding: 16px;
+            font-family: "Segoe UI", sans-serif; white-space: pre-wrap;
+            word-break: break-word; font-size: 0.88rem; line-height: 1.5;
+            color: #e2e8f0; border: 1px solid var(--border-color);
+            border-left: 4px solid var(--accent-green);
+            min-height: 420px; max-height: 600px; overflow-y: auto;
+        }
+        .btn-group { display: flex; gap: 10px; margin-top: 12px; }
+        .btn-action {
+            flex: 1; padding: 12px; border: none; border-radius: 8px;
+            font-weight: 700; font-size: 0.9rem; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
 
-        .container { max-width: 1280px; margin: 0 auto; display: none; grid-template-columns: 1fr 1fr; gap: 24px; }
-        .container.active { display: grid; }
-        .container#tab-historico.active, .container#tab-evolucao.active { display: block; }
+        .filter-bar {
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            border-radius: 10px; padding: 12px 16px; margin-bottom: 14px;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; gap: 10px;
+        }
+        .kpi-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+            gap: 12px; margin-bottom: 16px;
+        }
+        .kpi-card {
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            border-radius: 10px; padding: 14px; text-align: center;
+            border-bottom: 4px solid var(--accent-blue);
+        }
+        .kpi-card h3 { font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 5px; }
+        .kpi-card p { font-size: 1.35rem; font-weight: 800; color: #fff; }
 
-        @media (max-width: 1024px) { .container.active { grid-template-columns: 1fr; } }
-        
-        .card { background-color: var(--bg-card); border-radius: var(--radius-lg); padding: 24px; border: 1px solid var(--border-color); box-shadow: var(--shadow-card); margin-bottom: 24px; }
-        .card-title { font-size: 1.15rem; font-weight: 700; margin-bottom: 20px; color: var(--text-main); border-bottom: 1px solid var(--border-color); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center; letter-spacing: -0.3px; }
-        
-        .form-group { margin-bottom: 16px; }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-        input[type="text"], input[type="number"], select { width: 100%; padding: 11px 14px; background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-md); color: #ffffff; font-size: 0.95rem; font-weight: 500; transition: border-color 0.2s; }
-        input:focus, select:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); }
-        
-        .dynamic-row { background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 10px; border-radius: var(--radius-md); margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
-        .dynamic-inputs { display: flex; gap: 8px; align-items: center; }
-        .dynamic-inputs input { flex: 2; }
-        .dynamic-inputs select { flex: 1; }
-        .dynamic-inputs button { flex: 0; }
-        .tempo-select { flex: 1.2; background-color: var(--bg-input); color: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 11px 10px; font-size: 0.9rem; cursor: pointer; }
-        .problema-input, .tempo-custom-input { display: none; width: 100%; margin-top: 4px; }
+        .car-item {
+            background-color: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px; padding: 10px; margin-bottom: 8px; position: relative;
+        }
+        .car-info { font-size: 0.85rem; line-height: 1.4; padding-right: 125px; }
+        .action-btns { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
 
-        .btn-remove { background-color: #dc2626; color: white; border: none; border-radius: var(--radius-md); padding: 0 14px; height: 43px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
-        .btn-remove:hover { background-color: #b91c1c; }
-        
-        .btn-add { background-color: var(--accent-blue); color: white; border: none; border-radius: var(--radius-md); padding: 9px 14px; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; margin-bottom: 16px; transition: background 0.2s; }
-        .btn-add:hover { background-color: #1d4ed8; }
-        
-        .btn-reset { background-color: #dc2626; color: white; border: none; border-radius: 6px; padding: 6px 12px; font-size: 0.8rem; font-weight: bold; cursor: pointer; }
-        .btn-reset:hover { background-color: #b91c1c; }
-        
-        .btn-salvar-dia { background-color: var(--accent-green); color: #fff; font-size: 1rem; font-weight: 700; width: 100%; padding: 14px; border: none; border-radius: var(--radius-md); cursor: pointer; margin-top: 20px; transition: opacity 0.2s, box-shadow 0.2s; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3); }
-        .btn-salvar-dia:hover { opacity: 0.95; box-shadow: 0 6px 16px rgba(5, 150, 105, 0.4); }
+        .dynamic-row {
+            background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);
+            padding: 10px; border-radius: 8px; margin-bottom: 8px;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .dynamic-inputs { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
-        .section-subtitle { font-size: 0.85rem; font-weight: 700; color: var(--accent-amber); margin: 20px 0 12px 0; text-transform: uppercase; letter-spacing: 0.8px; }
-        
-        .preview-box { background-color: #070d1d; border-radius: var(--radius-md); padding: 18px; font-family: "Segoe UI", -apple-system, sans-serif; white-space: pre-wrap; word-break: break-word; font-size: 0.9rem; line-height: 1.6; color: #e2e8f0; border-left: 4px solid var(--accent-green); min-height: 440px; max-height: 620px; overflow-y: auto; border: 1px solid var(--border-color); }
-        
-        .btn-group { display: flex; gap: 12px; margin-top: 20px; }
-        .btn { flex: 1; padding: 12px 18px; border: none; border-radius: var(--radius-md); font-weight: 600; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: opacity 0.2s; }
-        .btn:hover { opacity: 0.9; }
-        .btn-success { background-color: #16a34a; color: #fff; }
-        .btn-secondary { background-color: var(--accent-blue); color: #fff; }
-        .btn-excel { background-color: #059669; color: #fff; font-weight: 600; }
-        .toast { position: fixed; bottom: 24px; right: 24px; background-color: var(--accent-green); color: #fff; padding: 14px 24px; border-radius: var(--radius-md); font-weight: bold; display: none; z-index: 1000; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); }
-        
-        .history-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.9rem; }
-        .history-table th, .history-table td { border: 1px solid var(--border-color); padding: 12px 14px; text-align: left; }
-        .history-table th { background-color: var(--bg-input); color: var(--text-main); font-weight: 700; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; }
-        .history-table tr:hover { background-color: rgba(59, 130, 246, 0.04); }
-        .badge-date { background-color: var(--accent-amber); color: #000; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; }
-        
-        .filter-panel { background: var(--bg-input); padding: 20px; border-radius: var(--radius-md); margin-bottom: 24px; border: 1px solid var(--border-color); display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; align-items: flex-end; }
-        .filter-panel .form-group { margin-bottom: 0; }
-        
-        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin-top: 10px; }
-        .kpi-card { background: var(--bg-input); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border-color); border-left: 5px solid var(--accent-blue); position: relative; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        .kpi-card h4 { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; font-weight: 700; letter-spacing: 0.8px; }
-        .kpi-card .val { font-size: 1.5rem; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+        .dynamic-row-card {
+            background-color: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 10px; margin-bottom: 8px;
+            display: grid; grid-template-columns: 120px 1fr 95px 85px 38px;
+            gap: 6px; align-items: center;
+        }
+        @media (max-width: 700px) { .dynamic-row-card { grid-template-columns: 1fr 1fr; } }
+        .dynamic-row-nok-box { grid-column: 1 / -1; margin-top: 4px; }
+
+        .model-block {
+            background-color: rgba(255, 255, 255, 0.03); padding: 8px 10px;
+            border-radius: 6px; margin-bottom: 8px; border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .model-title { font-size: 0.82rem; font-weight: 700; color: var(--accent-blue); margin-bottom: 6px; }
+
+        .history-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.86rem; }
+        .history-table th, .history-table td { border: 1px solid var(--border-color); padding: 10px; text-align: left; }
+        .history-table th { background: var(--bg-input); font-size: 0.75rem; text-transform: uppercase; }
+        .badge-date { background: var(--accent-amber); color: #000; padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 0.78rem; }
+
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+            display: none; justify-content: center; align-items: center; z-index: 9999;
+        }
+        .modal-card {
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            padding: 22px; border-radius: 12px; width: 92%; max-width: 420px;
+            border-top: 5px solid var(--accent-green);
+        }
+        .toast {
+            position: fixed; bottom: 20px; right: 20px; background: var(--accent-green);
+            color: #000; padding: 12px 20px; border-radius: 8px; font-weight: 800;
+            display: none; z-index: 10000; box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <div>
-            <h1>📋 Report Diário Infiltração</h1>
-            <div class="subtitle">
-                <span>Controle de Produção, Metas, FTT (%), Liberação Offline e Tratativas (Turno A)</span>
-                <span id="cloudStatus" class="status-cloud">● Nuvem Conectada</span>
-            </div>
-        </div>
-        <div class="date-selector-box">
-            <label for="dataLancamento">📅 Data de Lançamento:</label>
-            <input type="date" id="dataLancamento" onchange="mudarDataLancamento()">
-        </div>
-    </div>
-
-    <div class="nav-tabs">
-        <button class="tab-btn active" onclick="trocarAba('editor', event)">✏️ Edição & Report</button>
-        <button class="tab-btn" onclick="trocarAba('historico', event)">📈 Histórico por Data</button>
-        <button class="tab-btn" onclick="trocarAba('evolucao', event)">📊 Evolução & Indicadores</button>
-        <button class="tab-btn btn-excel" onclick="exportarExcel()" style="margin-left:auto;">📥 Exportar Excel</button>
-        <button class="tab-btn" style="background:#7c3aed; color:#fff; border-color:#6d28d9;" onclick="document.getElementById('importFile').click()">📤 Importar Excel</button>
-        <input type="file" id="importFile" accept=".xlsx, .xls, .csv" style="display:none" onchange="importarExcel(event)">
-    </div>
-
-    <!-- ABA 1: EDITOR -->
-    <div id="tab-editor" class="container active">
-        <div class="card">
-            <div class="card-title">
-                <span>📝 Dados do Dia Selecionado</span>
-                <button class="btn-reset" onclick="limparTudo()">🧹 Limpar Dia</button>
-            </div>
-            
-            <div class="form-row">
-                <div class="form-group"><label>🎯 Objetivo (Meta) *</label><input type="number" id="objetivo" placeholder="Ex: 430" oninput="atualizarPreview()"></div>
-                <div class="form-group"><label>📊 Produção Realizada *</label><input type="text" id="prodRealizada" placeholder="Ex: 500" oninput="atualizarPreview()"></div>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group"><label>🫧 Bolhas *</label><input type="number" id="bolhas" placeholder="0" oninput="atualizarPreview()"></div>
-                <div class="form-group"><label>❌ Carros NOK *</label><input type="number" id="carrosNOK" placeholder="0" oninput="atualizarPreview()"></div>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group"><label>📲 Liberação Offline</label><input type="number" id="liberacaoOffline" value="0" oninput="atualizarPreview()"></div>
-                <div class="form-group"><label>🔄 Reinspeção</label><input type="number" id="reinspecao" value="0" oninput="atualizarPreview()"></div>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group" style="grid-column: span 2;"><label>🛠️ Tratativas</label><input type="number" id="tratativas" value="0" oninput="atualizarPreview()"></div>
-            </div>
-
-            <div class="section-subtitle">🚨 TOP 3 Problemas</div>
-            <div class="form-group">
-                <label>1️⃣ Primeiro Lugar</label>
-                <div class="form-row" style="grid-template-columns: 3fr 1fr;">
-                    <input type="text" id="top1_desc" placeholder="Descrição do problema 1" oninput="atualizarPreview()">
-                    <input type="number" id="top1_qtd" placeholder="Qtd" oninput="atualizarPreview()">
-                </div>
-            </div>
-            <div class="form-group">
-                <label>2️⃣ Segundo Lugar</label>
-                <div class="form-row" style="grid-template-columns: 3fr 1fr;">
-                    <input type="text" id="top2_desc" placeholder="Descrição do problema 2" oninput="atualizarPreview()">
-                    <input type="number" id="top2_qtd" placeholder="Qtd" oninput="atualizarPreview()">
-                </div>
-            </div>
-            <div class="form-group">
-                <label>3️⃣ Terceiro Lugar</label>
-                <div class="form-row" style="grid-template-columns: 3fr 1fr;">
-                    <input type="text" id="top3_desc" placeholder="Descrição do problema 3" oninput="atualizarPreview()">
-                    <input type="number" id="top3_qtd" placeholder="Qtd" oninput="atualizarPreview()">
-                </div>
-            </div>
-
-            <div class="section-subtitle">⚠️ Ocorrência / Ação</div>
-            <div class="form-group"><label>Ocorrência</label><input type="text" id="ocorrencia" placeholder="Descreva a ocorrência..." oninput="atualizarPreview()"></div>
-            <div class="form-group"><label>Ação Tomada</label><input type="text" id="acao" placeholder="Descreva a ação..." oninput="atualizarPreview()"></div>
-
-            <!-- AUDITORIA COM OPÇÕES EXPANDIDAS E TEMPO PERSONALIZADO -->
-            <div class="section-subtitle">🔍 Auditoria Teste Intensivo</div>
-            <div id="container-auditoria"></div>
-            <button class="btn-add" onclick="adicionarCampoAuditoria()">➕ Adicionar Carro Auditoria</button>
-
-            <div class="section-subtitle">📝 Observações Gerais</div>
-            <div id="container-obs"></div>
-            <button class="btn-add" onclick="adicionarCampoObs()">➕ Adicionar Observação</button>
-
-            <button class="btn-salvar-dia" onclick="salvarDadosDoDia()">💾 Salvar / Atualizar Dados do Dia</button>
+    <!-- CABEÇALHO GLOBAL UNIFICADO -->
+    <div class="global-header">
+        <div class="global-title">
+            <h1>🏭 Central de Qualidade & Infiltração</h1>
+            <p>1. Produção diaria Infiltração • 2. Offline de Infiltração • 3. Reinspeção de Infiltração / Auditoria</p>
         </div>
 
-        <div>
-            <div class="card" style="position: sticky; top: 20px;">
-                <div class="card-title">📱 Pré-visualização para WhatsApp</div>
-                <div id="preview" class="preview-box"></div>
-                <div class="btn-group">
-                    <button class="btn btn-success" onclick="copiarTexto()">📋 Copiar Mensagem</button>
-                    <button class="btn btn-secondary" onclick="enviarWhatsApp()">📲 Abrir no WhatsApp</button>
-                </div>
+        <div class="global-controls">
+            <div class="date-box">
+                <label for="globalData">📅 Data Geral:</label>
+                <input type="date" id="globalData" onchange="sincronizarDataGlobal(this.value)">
+            </div>
+            <div class="cloud-badges">
+                <span id="status-rep" class="status-cloud">● Produção: Conectado</span>
+                <span id="status-nc" class="status-cloud">● Offline: Conectado</span>
+                <span id="status-off" class="status-cloud">● Reinspeção/Auditoria: Conectado</span>
             </div>
         </div>
     </div>
 
-    <!-- ABA 2: HISTÓRICO POR DATA -->
-    <div id="tab-historico" class="container">
-        <div class="card" style="grid-column: span 2;">
-            <div class="card-title">📈 Registros Salvos por Data</div>
-            <div style="overflow-x: auto;">
-                <table class="history-table">
-                    <thead>
-                        <tr>
-                            <th>Data</th>
-                            <th>Meta</th>
-                            <th>Realizado</th>
-                            <th>FTT (%)</th>
-                            <th>Bolhas</th>
-                            <th>NOK</th>
-                            <th>Lib. Offline</th>
-                            <th>Tratativas</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabela-historico-corpo">
-                        <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Carregando dados da nuvem...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <!-- ABAS PRINCIPAIS -->
+    <div class="main-nav">
+        <button class="main-tab-btn active" onclick="abrirModulo('mod-report', this)">📊 1. Produção diaria Infiltração</button>
+        <button class="main-tab-btn" onclick="abrirModulo('mod-nc', this)">📋 2. Offline de Infiltração</button>
+        <button class="main-tab-btn" onclick="abrirModulo('mod-reparo', this)">➡️ 3. Reinspeção de Infiltração / Auditoria</button>
     </div>
 
-    <!-- ABA 3: EVOLUÇÃO E FILTROS EXECUTIVOS -->
-    <div id="tab-evolucao" class="container">
-        <div class="card" style="grid-column: span 2;">
-            <div class="card-title">📊 Painel Executivo de Evolução & Desempenho</div>
-            
-            <div class="filter-panel">
+    <!-- =====================================================================
+         1. PRODUÇÃO DIARIA INFILTRAÇÃO
+         ===================================================================== -->
+    <section id="mod-report" class="module-section active">
+        <div class="sub-nav">
+            <button class="sub-tab-btn active" onclick="rep_trocarAba('editor', this)">✏️ Edição & Report</button>
+            <button class="sub-tab-btn" onclick="rep_trocarAba('historico', this)">📈 Histórico por Data</button>
+            <button class="sub-tab-btn" onclick="rep_trocarAba('evolucao', this)">📊 Evolução & Indicadores</button>
+            <button class="btn-tool btn-green" style="margin-left:auto;" onclick="rep_exportarExcel()">📥 Exportar Excel</button>
+            <button class="btn-tool btn-purple" onclick="document.getElementById('rep_importFile').click()">📤 Importar Excel</button>
+            <input type="file" id="rep_importFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="rep_importarExcel(event)">
+        </div>
+
+        <div id="rep-tab-editor" class="grid-2">
+            <div class="card">
+                <div class="card-title">
+                    <span>📝 Dados da Produção Diária</span>
+                    <button class="btn-tool btn-red" onclick="rep_limparTudo()">🧹 Limpar Dia</button>
+                </div>
+
+                <!-- GRUPO 1: META & REALIZADO -->
+                <div class="metric-group-box">
+                    <div class="metric-group-header">
+                        <span>📈 Volume & Meta do Turno</span>
+                        <span id="rep_ftt_badge" class="ftt-live-pill">FTT: 0.0%</span>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="rep_objetivo">🎯 Objetivo (Meta) *</label>
+                            <input type="number" id="rep_objetivo" placeholder="Ex: 430" oninput="rep_atualizarPreview()">
+                        </div>
+                        <div class="form-group">
+                            <label for="rep_prodRealizada">📊 Produção Realizada *</label>
+                            <input type="text" id="rep_prodRealizada" placeholder="Ex: 500" oninput="rep_atualizarPreview()">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GRUPO 2: QUALIDADE & OCORRÊNCIAS -->
+                <div class="metric-group-box">
+                    <div class="metric-group-header">
+                        <span>🔍 Indicadores de Qualidade</span>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="rep_bolhas">🫧 Bolhas *</label>
+                            <input type="number" id="rep_bolhas" placeholder="0" oninput="rep_atualizarPreview()">
+                        </div>
+                        <div class="form-group">
+                            <label for="rep_carrosNOK">❌ Carros NOK *</label>
+                            <input type="number" id="rep_carrosNOK" placeholder="0" oninput="rep_atualizarPreview()">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GRUPO 3: INTEGRAÇÕES AUTOMÁTICAS & TRATATIVAS -->
+                <div class="metric-group-box">
+                    <div class="metric-group-header">
+                        <span>🔗 Fluxo Offline, Auditoria & Tratativas</span>
+                    </div>
+                    <div class="form-row">
+                        <div class="auto-field-card">
+                            <label for="rep_liberacaoOffline">📲 OFFLINE DE INFILTRAÇÃO</label>
+                            <input type="number" id="rep_liberacaoOffline" value="0" oninput="rep_atualizarPreview()">
+                            <div class="auto-footer-row">
+                                <span class="auto-badge-text">⚡ Automático (2. Offline de Infiltração)</span>
+                                <button type="button" class="btn-sync-mini" onclick="rep_aplicarTotaisAutomaticos(true)">↻ Puxar</button>
+                            </div>
+                        </div>
+                        <div class="auto-field-card">
+                            <label for="rep_reinspecao">🔄 REINSPEÇÃO DE INFILTRAÇÃO / AUDITORIA</label>
+                            <input type="number" id="rep_reinspecao" value="0" oninput="rep_atualizarPreview()">
+                            <div class="auto-footer-row">
+                                <span class="auto-badge-text">⚡ Automático (3. Reinspeção / Auditoria)</span>
+                                <button type="button" class="btn-sync-mini" onclick="rep_aplicarTotaisAutomaticos(true)">↻ Puxar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top:12px;">
+                        <label for="rep_tratativas">🛠️ Tratativas</label>
+                        <input type="number" id="rep_tratativas" value="0" oninput="rep_atualizarPreview()">
+                    </div>
+                </div>
+
+                <div class="section-subtitle">🚨 TOP 3 Problemas</div>
                 <div class="form-group">
-                    <label>🔍 Critério de Período:</label>
-                    <select id="tipoFiltro" onchange="mudarTipoFiltro()">
+                    <div class="form-row" style="grid-template-columns:3fr 1fr;">
+                        <input type="text" id="rep_top1_desc" placeholder="1º Problema" oninput="rep_atualizarPreview()">
+                        <input type="number" id="rep_top1_qtd" placeholder="Qtd" oninput="rep_atualizarPreview()">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="form-row" style="grid-template-columns:3fr 1fr;">
+                        <input type="text" id="rep_top2_desc" placeholder="2º Problema" oninput="rep_atualizarPreview()">
+                        <input type="number" id="rep_top2_qtd" placeholder="Qtd" oninput="rep_atualizarPreview()">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="form-row" style="grid-template-columns:3fr 1fr;">
+                        <input type="text" id="rep_top3_desc" placeholder="3º Problema" oninput="rep_atualizarPreview()">
+                        <input type="number" id="rep_top3_qtd" placeholder="Qtd" oninput="rep_atualizarPreview()">
+                    </div>
+                </div>
+
+                <div class="section-subtitle">⚠️ Ocorrência / Ação</div>
+                <div class="form-group"><label>Ocorrência</label><input type="text" id="rep_ocorrencia" placeholder="Descreva a ocorrência..." oninput="rep_atualizarPreview()"></div>
+                <div class="form-group"><label>Ação Tomada</label><input type="text" id="rep_acao" placeholder="Descreva a ação..." oninput="rep_atualizarPreview()"></div>
+
+                <div class="section-subtitle">
+                    <span>🔍 AUDITORIA TESTE INTENSIVO</span>
+                    <span style="font-size:0.7rem;color:var(--accent-green);text-transform:none;">⚡ Automático de Veículos Auditoria</span>
+                </div>
+                <div id="rep_container-auditoria"></div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">
+                    <button type="button" class="btn-tool btn-blue" onclick="rep_adicionarCampoAuditoria()">➕ Adicionar Carro Auditoria</button>
+                    <button type="button" class="btn-tool btn-amber" onclick="rep_sincronizarAuditoriaDeVeiculos(true)">↻ Sincronizar Veículos</button>
+                </div>
+
+                <div class="section-subtitle">📝 Observações Gerais</div>
+                <div id="rep_container-obs"></div>
+                <button type="button" class="btn-tool btn-blue" onclick="rep_adicionarCampoObs()">➕ Adicionar Observação</button>
+
+                <button type="button" class="btn-tool btn-green btn-full" onclick="rep_salvarDadosDoDia()">💾 Salvar / Atualizar Dados do Dia</button>
+            </div>
+
+            <div>
+                <div class="card" style="position:sticky; top:16px;">
+                    <div class="card-title">📱 Pré-visualização WhatsApp (Produção Diária)</div>
+                    <div id="rep_preview" class="preview-box"></div>
+                    <div class="btn-group">
+                        <button class="btn-action btn-green" onclick="copiarTextoGenerico(rep_gerarTextoWhatsApp())">📋 Copiar Mensagem</button>
+                        <button class="btn-action btn-blue" onclick="enviarWhatsAppGenerico(rep_gerarTextoWhatsApp())">📲 Abrir WhatsApp</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="rep-tab-historico" style="display:none;">
+            <div class="card">
+                <div class="card-title">📈 Registros Salvos por Data</div>
+                <div style="overflow-x:auto;">
+                    <table class="history-table">
+                        <thead>
+                            <tr><th>Data</th><th>Meta</th><th>Realizado</th><th>FTT (%)</th><th>Bolhas</th><th>NOK</th><th>Offline de Infiltração</th><th>Reinspeção / Auditoria</th><th>Tratativas</th></tr>
+                        </thead>
+                        <tbody id="rep_tabela-historico"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="rep-tab-evolucao" style="display:none;">
+            <div class="card">
+                <div class="card-title">📊 Evolução & Desempenho</div>
+                <div class="filter-bar">
+                    <select id="rep_tipoFiltro" style="width:auto;" onchange="rep_mudarTipoFiltro()">
                         <option value="dia">Dia Específico</option>
-                        <option value="semana">Últimos 7 Dias (c/ Sábado)</option>
+                        <option value="semana">Últimos 7 Dias</option>
                         <option value="mes">Mês Completo</option>
                         <option value="personalizado">Intervalo Personalizado</option>
                     </select>
+                    <input type="date" id="rep_filtroDataUnica" style="width:auto;" onchange="rep_calcularEvolucao()">
+                    <div id="rep_boxIntervalo" style="display:none; gap:8px;">
+                        <input type="date" id="rep_filtroDataInicio" style="width:auto;" onchange="rep_calcularEvolucao()">
+                        <input type="date" id="rep_filtroDataFim" style="width:auto;" onchange="rep_calcularEvolucao()">
+                    </div>
                 </div>
-                <div class="form-group" id="boxDataUnica">
-                    <label>📅 Data de Referência:</label>
-                    <input type="date" id="filtroDataUnica" onchange="calcularEvolucaoPersonalizada()">
+                <div class="kpi-grid" id="rep_kpi-metrics"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =====================================================================
+         2. OFFLINE DE INFILTRAÇÃO
+         ===================================================================== -->
+    <section id="mod-nc" class="module-section">
+        <div class="filter-bar">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <label style="margin:0;">📊 Período KPIs (Offline de Infiltração):</label>
+                <select id="nc_kpiPeriodoSelect" style="width:auto;" onchange="nc_tratarMudancaPeriodoKpi()">
+                    <option value="DIA_SELECIONADO">Dia Selecionado</option>
+                    <option value="HOJE">Hoje</option>
+                    <option value="MES_ATUAL">Este Mês</option>
+                    <option value="MES_ANTERIOR">Mês Anterior</option>
+                    <option value="INTERVALO">Intervalo...</option>
+                    <option value="TOTAL_GERAL">Todo Histórico</option>
+                </select>
+                <div id="nc_kpiCustomDates" style="display:none; gap:6px; align-items:center;">
+                    <input type="date" id="nc_kpiDataInicio" style="width:auto;" onchange="nc_atualizarIndicadoresSuperiores()">
+                    <span>até</span>
+                    <input type="date" id="nc_kpiDataFim" style="width:auto;" onchange="nc_atualizarIndicadoresSuperiores()">
                 </div>
-                <div class="form-group" id="boxDataInicio" style="display:none;">
-                    <label>📅 Data Início:</label>
-                    <input type="date" id="filtroDataInicio" onchange="calcularEvolucaoPersonalizada()">
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn-tool btn-green" onclick="nc_abrirModalExportacao()">📊 Exportar Excel</button>
+                <button class="btn-tool btn-blue" onclick="document.getElementById('nc_inputExcel').click()">📥 Importar Excel</button>
+                <input type="file" id="nc_inputExcel" accept=".xlsx,.xls,.csv" style="display:none" onchange="nc_importarDeExcel(event)">
+            </div>
+        </div>
+
+        <div class="kpi-grid">
+            <div class="kpi-card" style="border-bottom-color: var(--accent-red);"><h3 id="nc_kpi-titulo">🚗 Total Offline no Período</h3><p id="nc_kpi-total" style="color:var(--accent-red);">0</p></div>
+            <div class="kpi-card"><h3>🚗 HA2</h3><p id="nc_kpi-ha2">0</p></div>
+            <div class="kpi-card"><h3>🚙 SA6</h3><p id="nc_kpi-sa6">0</p></div>
+            <div class="kpi-card"><h3>⚡ EQE</h3><p id="nc_kpi-eqe">0</p></div>
+            <div class="kpi-card"><h3>🚘 SA2</h3><p id="nc_kpi-sa2">0</p></div>
+            <div class="kpi-card"><h3>🚙 SC3H</h3><p id="nc_kpi-sc3h">0</p></div>
+            <div class="kpi-card" style="border-bottom-color: var(--accent-amber);"><h3>📈 Acumulado Geral</h3><p id="nc_kpi-geral" style="color:var(--accent-amber);">0 Carros</p></div>
+        </div>
+
+        <div class="grid-2">
+            <div>
+                <div class="card" style="border: 2px solid var(--accent-blue);">
+                    <div class="card-title" id="nc_form-title">
+                        <span>➕ Inserir Offline de Infiltração</span>
+                        <div style="display:flex; gap:6px;">
+                            <button type="button" class="btn-tool" style="background:#64748b;" onclick="nc_resetarFormulario()">🔄 Novo Chassi</button>
+                            <button type="button" class="btn-tool btn-red" onclick="nc_limparDia()">🧹 Limpar Dia</button>
+                        </div>
+                    </div>
+                    <input type="hidden" id="nc_edit_id">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Chassi / Carro</label>
+                            <input type="text" id="nc_chassi" placeholder="Ex: VK079535" oninput="nc_atualizarPreviaEmTempoReal()" onblur="nc_verificarChassiExistente()">
+                        </div>
+                        <div class="form-group">
+                            <label>Modelo</label>
+                            <select id="nc_modelo" onchange="nc_atualizarPreviaEmTempoReal()">
+                                <option value="HA2">HA2</option>
+                                <option value="SA6">SA6</option>
+                                <option value="EQE">EQE</option>
+                                <option value="SA2">SA2</option>
+                                <option value="SC3H">SC3H</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Local da Não Conformidade</label>
+                        <input type="text" id="nc_local" placeholder="Ex: Moldura Coluna B (L/D)" oninput="nc_atualizarPreviaEmTempoReal()">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Não Conformidade</label>
+                            <select id="nc_defeito" onchange="nc_atualizarPreviaEmTempoReal()">
+                                <option value="">Selecione...</option>
+                                <option value="Amassado">Amassado</option>
+                                <option value="Risco">Risco</option>
+                                <option value="Risco de caneta">Risco de caneta</option>
+                                <option value="Danificado">Danificado</option>
+                                <option value="Mancha">Mancha</option>
+                                <option value="Sujidade">Sujidade</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Tratativa</label>
+                            <select id="nc_tratativa" onchange="nc_atualizarPreviaEmTempoReal()">
+                                <option value="">Selecione...</option>
+                                <option value="Pintura">Pintura</option>
+                                <option value="Martelinho">Martelinho</option>
+                                <option value="Polimento">Polimento</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn-tool btn-amber btn-full" onclick="nc_salvarParcial()">💾 Salvar Parcialmente (Fixar Chassi)</button>
+                    <button type="button" id="nc_btn-submit" class="btn-tool btn-blue btn-full" onclick="nc_cadastrarCarro()">📥 Lançar e Concluir no Relatório</button>
                 </div>
-                <div class="form-group" id="boxDataFim" style="display:none;">
-                    <label>📅 Data Fim:</label>
-                    <input type="date" id="filtroDataFim" onchange="calcularEvolucaoPersonalizada()">
+
+                <div class="card">
+                    <div class="card-title">
+                        <span>📑 Veículos Lançados na Data (Offline de Infiltração)</span>
+                        <span id="nc_total-registros" style="color:var(--accent-amber); font-size:0.85rem;">0 itens</span>
+                    </div>
+                    <div id="nc_lista-lancados"></div>
                 </div>
             </div>
 
-            <div class="kpi-grid" id="kpi-container-metrics">
-                <!-- Preenchido via JS -->
+            <div>
+                <div class="card" style="position:sticky; top:16px;">
+                    <div class="card-title">📱 Pré-visualização WhatsApp (Offline de Infiltração)</div>
+                    <div id="nc_preview" class="preview-box"></div>
+                    <div class="btn-group">
+                        <button class="btn-action btn-green" onclick="copiarTextoGenerico(nc_gerarTextoWhatsApp())">📋 Copiar Mensagem</button>
+                        <button class="btn-action btn-blue" onclick="enviarWhatsAppGenerico(nc_gerarTextoWhatsApp())">📲 Abrir WhatsApp</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =====================================================================
+         3. REINSPEÇÃO DE INFILTRAÇÃO / AUDITORIA
+         ===================================================================== -->
+    <section id="mod-reparo" class="module-section">
+        <div class="sub-nav">
+            <button class="sub-tab-btn active" onclick="off_trocarAba('editor', this)">✏️ Edição & Report</button>
+            <button class="sub-tab-btn" onclick="off_trocarAba('historico', this)">📈 Histórico por Data</button>
+            <button class="sub-tab-btn" onclick="off_trocarAba('evolucao', this)">📊 Evolução & Indicadores</button>
+            <button class="btn-tool btn-green" style="margin-left:auto;" onclick="off_abrirModalExportacao()">📊 Exportar Excel</button>
+        </div>
+
+        <div id="off-tab-editor" class="grid-2">
+            <div class="card">
+                <div class="card-title">
+                    <span>📝 Dados do Turno (Reinspeção de Infiltração / Auditoria)</span>
+                    <div style="display:flex; gap:6px;">
+                        <button type="button" class="btn-tool btn-blue" onclick="off_salvarManualmente()">💾 Salvar</button>
+                        <button type="button" class="btn-tool btn-red" onclick="off_limparTudo()">🧹 Limpar</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>⏱️ Turno</label>
+                    <input type="text" id="off_turno" value="TURNO A" oninput="off_aoEditarCampo()">
+                </div>
+
+                <div class="section-subtitle">🔋 Início do Turno</div>
+                <div class="form-row-4">
+                    <div><label>Reparo</label><input type="number" id="off_ini_reparo" value="0" min="0" oninput="off_aoEditarCampo()"></div>
+                    <div><label>Reinspeção de Infiltração / Auditoria</label><input type="number" id="off_ini_reinspecao" value="0" min="0" oninput="off_aoEditarCampo()"></div>
+                    <div><label>Estrada</label><input type="number" id="off_ini_estrada" value="0" min="0" oninput="off_aoEditarCampo()"></div>
+                    <div><label>Elétrica</label><input type="number" id="off_ini_eletrica" value="0" min="0" oninput="off_aoEditarCampo()"></div>
+                </div>
+
+                <div class="section-subtitle">🪫 Final do Turno</div>
+                <div class="form-row-4">
+                    <div><label>Reparo</label><input type="number" id="off_fin_reparo" value="0" min="0" oninput="off_aoEditarCampo()"></div>
+                    <div><label>Reinspeção de Infiltração / Auditoria</label><input type="number" id="off_fin_reinspecao" value="0" min="0" oninput="off_aoEditarCampo()"></div>
+                    <div><label>Estrada</label><input type="number" id="off_fin_estrada" value="0" min="0" oninput="off_aoEditarCampo()"></div>
+                    <div><label>Elétrica</label><input type="number" id="off_fin_eletrica" value="0" min="0" oninput="off_aoEditarCampo()"></div>
+                </div>
+
+                <div class="section-subtitle">📋 Reinspeção de Infiltração / Auditoria Padrão</div>
+                <div class="model-block"><div class="model-title">EQE (Dolphin)</div><div class="form-row"><div><label>✅ Reinspeção / Auditoria</label><input type="number" id="off_eqe_ok" value="0" min="0" oninput="off_aoEditarCampo()"></div><div><label>❌ Reprovados</label><input type="number" id="off_eqe_nok" value="0" min="0" oninput="off_aoEditarCampo()"></div></div></div>
+                <div class="model-block"><div class="model-title">SONG (SA2)</div><div class="form-row"><div><label>✅ Reinspeção / Auditoria</label><input type="number" id="off_song_sa2_ok" value="0" min="0" oninput="off_aoEditarCampo()"></div><div><label>❌ Reprovado</label><input type="number" id="off_song_sa2_nok" value="0" min="0" oninput="off_aoEditarCampo()"></div></div></div>
+                <div class="model-block"><div class="model-title">KING (HA2)</div><div class="form-row"><div><label>✅ Reinspeção / Auditoria</label><input type="number" id="off_king_ok" value="0" min="0" oninput="off_aoEditarCampo()"></div><div><label>❌ Reprovado</label><input type="number" id="off_king_nok" value="0" min="0" oninput="off_aoEditarCampo()"></div></div></div>
+                <div class="model-block"><div class="model-title">SONG (SA6)</div><div class="form-row"><div><label>✅ Reinspeção / Auditoria</label><input type="number" id="off_song_sa6_ok" value="0" min="0" oninput="off_aoEditarCampo()"></div><div><label>❌ Reprovado</label><input type="number" id="off_song_sa6_nok" value="0" min="0" oninput="off_aoEditarCampo()"></div></div></div>
+                <div class="model-block"><div class="model-title">SC3H (Atto)</div><div class="form-row"><div><label>✅ Reinspeção / Auditoria</label><input type="number" id="off_sc3h_ok" value="0" min="0" oninput="off_aoEditarCampo()"></div><div><label>❌ Reprovado</label><input type="number" id="off_sc3h_nok" value="0" min="0" oninput="off_aoEditarCampo()"></div></div></div>
+                <div class="model-block"><div class="model-title">SC3E (Yuan)</div><div class="form-row"><div><label>✅ Reinspeção / Auditoria</label><input type="number" id="off_sc3e_ok" value="0" min="0" oninput="off_aoEditarCampo()"></div><div><label>❌ Reprovado</label><input type="number" id="off_sc3e_nok" value="0" min="0" oninput="off_aoEditarCampo()"></div></div></div>
+
+                <div class="section-subtitle">🔎 VEÍCULOS AUDITORIA</div>
+                <div id="off_container-auditoria"></div>
+                <button type="button" class="btn-tool btn-blue btn-full" onclick="off_adicionarCampoAuditoria()">➕ Adicionar Veículo</button>
+
+                <div style="background:rgba(16,185,129,0.15); border:1px solid var(--accent-green); color:var(--accent-green); padding:10px; border-radius:8px; font-weight:700; margin-top:12px; display:flex; justify-content:space-between;">
+                    <span>🧮 Total Reinspeção de Infiltração / Auditoria:</span>
+                    <span id="off_total-text">✅ 0 | ❌ 0</span>
+                </div>
+            </div>
+
+            <div>
+                <div class="card" style="position:sticky; top:16px;">
+                    <div class="card-title">📱 Pré-visualização WhatsApp (Reinspeção de Infiltração / Auditoria)</div>
+                    <div id="off_preview" class="preview-box"></div>
+                    <div class="btn-group">
+                        <button class="btn-action btn-green" onclick="copiarTextoGenerico(off_gerarTextoWhatsApp())">📋 Copiar Mensagem</button>
+                        <button class="btn-action btn-blue" onclick="enviarWhatsAppGenerico(off_gerarTextoWhatsApp())">📲 Abrir WhatsApp</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="off-tab-historico" style="display:none;">
+            <div class="card">
+                <div class="card-title">📈 Registros Salvos por Data (Reinspeção de Infiltração / Auditoria)</div>
+                <div style="overflow-x:auto;">
+                    <table class="history-table">
+                        <thead><tr><th>Data</th><th>Turno</th><th>Total OK</th><th>Total NOK</th><th>Total Geral</th></tr></thead>
+                        <tbody id="off_tabela-historico"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="off-tab-evolucao" style="display:none;">
+            <div class="card">
+                <div class="card-title">📊 Evolução & Desempenho (Reinspeção de Infiltração / Auditoria)</div>
+                <div class="filter-bar">
+                    <select id="off_tipoFiltro" style="width:auto;" onchange="off_mudarTipoFiltro()">
+                        <option value="dia">Dia Específico</option>
+                        <option value="semana">Últimos 7 Dias</option>
+                        <option value="mes">Mês Completo</option>
+                        <option value="personalizado">Intervalo Personalizado</option>
+                        <option value="todos">Todo Histórico</option>
+                    </select>
+                    <input type="date" id="off_filtroDataUnica" style="width:auto;" onchange="off_calcularEvolucao()">
+                    <div id="off_boxIntervalo" style="display:none; gap:8px;">
+                        <input type="date" id="off_filtroDataInicio" style="width:auto;" onchange="off_calcularEvolucao()">
+                        <input type="date" id="off_filtroDataFim" style="width:auto;" onchange="off_calcularEvolucao()">
+                    </div>
+                </div>
+                <div class="kpi-grid" id="off_kpi-metrics"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- MODAL UNIFICADO DE EXPORTAÇÃO EXCEL -->
+    <div id="modalExport" class="modal-overlay">
+        <div class="modal-card">
+            <h3 id="modalExportTitle" style="margin-bottom:14px;">📊 Exportar Relatório para Excel</h3>
+            <div class="form-group">
+                <label>Selecione o período:</label>
+                <select id="exportPeriodoOpcao" onchange="document.getElementById('wrapExportIntervalo').style.display = (this.value === 'INTERVALO') ? 'flex' : 'none'">
+                    <option value="DIA_SELECIONADO">Dia Selecionado</option>
+                    <option value="HOJE">Lançamentos de Hoje</option>
+                    <option value="MES_ATUAL">Todo Este Mês</option>
+                    <option value="MES_ANTERIOR">Mês Anterior</option>
+                    <option value="INTERVALO">Intervalo de Datas</option>
+                    <option value="TODOS">Todo o Histórico Acumulado</option>
+                </select>
+            </div>
+            <div id="wrapExportIntervalo" style="display:none; gap:8px; margin-bottom:12px;">
+                <div style="flex:1;"><label>Início:</label><input type="date" id="exportDataInicio"></div>
+                <div style="flex:1;"><label>Fim:</label><input type="date" id="exportDataFim"></div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px;">
+                <button class="btn-tool" style="background:#475569;" onclick="document.getElementById('modalExport').style.display='none'">Cancelar</button>
+                <button class="btn-tool btn-green" onclick="confirmarExportacaoModal()">📥 Baixar (.xlsx)</button>
             </div>
         </div>
     </div>
 
     <div id="toast" class="toast">Operação realizada com sucesso!</div>
 
-    <script>
-        // ==========================================================
-        // ⚙️ CONFIGURAÇÃO DO FIREBASE
-        // ==========================================================
-        const firebaseConfig = {
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+        // 1. FIREBASE: OFFLINE DE INFILTRAÇÃO (offline-bccb6)
+        const appNC = initializeApp({
+            apiKey: "AIzaSyD7E8LEykakKrSd9rZo5PRKJCJMn2OjwP0",
+            authDomain: "offline-bccb6.firebaseapp.com",
+            projectId: "offline-bccb6",
+            storageBucket: "offline-bccb6.firebasestorage.app",
+            messagingSenderId: "86368085943",
+            appId: "1:86368085943:web:2c4f1168a840945eeaaa32"
+        }, "appNC");
+        const dbNC = getFirestore(appNC);
+        const docRefNC = doc(dbNC, "qualidade_infiltracao", "dados_relatorio");
+
+        // 2. FIREBASE: PRODUÇÃO DIÁRIA INFILTRAÇÃO (turno-a)
+        const appReport = initializeApp({
             apiKey: "AIzaSyBeWssEdC-JzbigEEYFj7pE71V_wVf2_HY",
             authDomain: "turno-a.firebaseapp.com",
             databaseURL: "https://turno-a-default-rtdb.firebaseio.com",
@@ -306,404 +782,730 @@
             storageBucket: "turno-a.firebasestorage.app",
             messagingSenderId: "508911260921",
             appId: "1:508911260921:web:4252cf00547b17af207e28"
+        }, "appReport");
+        const dbReport = getFirestore(appReport);
+
+        // 3. FIREBASE: REINSPEÇÃO DE INFILTRAÇÃO / AUDITORIA (reparo-7a859)
+        const appReparo = initializeApp({
+            apiKey: "AIzaSyD6UMqflWGdFuHbo4eaXopKoX5ABWpK1DQ",
+            authDomain: "reparo-7a859.firebaseapp.com",
+            databaseURL: "https://reparo-7a859-default-rtdb.firebaseio.com",
+            projectId: "reparo-7a859",
+            storageBucket: "reparo-7a859.firebasestorage.app",
+            messagingSenderId: "280653134419",
+            appId: "1:280653134419:web:c772c214341b3481fbe4a6"
+        }, "appReparo");
+        const dbReparo = getFirestore(appReparo);
+
+        let dataGlobal = '';
+        let modoExportacaoAtual = 'NC';
+        let nc_ultimaAlteracaoLocal = 0;
+        let off_ultimaAlteracaoLocal = 0;
+        let off_syncTimer = null;
+
+        function obterDataHoje() {
+            const h = new Date();
+            return `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, '0')}-${String(h.getDate()).padStart(2, '0')}`;
+        }
+
+        function formatarDataBR(iso) {
+            if (!iso) return '';
+            const p = iso.split('-');
+            return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
+        }
+
+        function setBadgeStatus(id, texto, estado) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.innerText = texto;
+            el.className = "status-cloud" + (estado === 'sync' ? ' syncing' : estado === 'off' ? ' offline' : '');
+        }
+
+        window.exibirToast = function(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.style.display = 'block';
+            clearTimeout(window._toastTimer);
+            window._toastTimer = setTimeout(() => { t.style.display = 'none'; }, 2800);
         };
 
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const COLLECTION_NAME = "reports_infiltracao";
-        const STORAGE_KEY_PENDENTES = "reports_pendentes_offline";
-
-        let dataAtual = '';
-        let cacheRegistros = [];
-
-        function setCloudStatus(texto, tipo) {
-            const statusEl = document.getElementById('cloudStatus');
-            if(statusEl) {
-                statusEl.innerText = texto;
-                if(tipo === 'warning') {
-                    statusEl.className = "status-cloud syncing";
-                } else if(tipo === 'offline') {
-                    statusEl.className = "status-cloud offline";
-                } else {
-                    statusEl.className = "status-cloud";
-                }
+        window.copiarTextoGenerico = function(texto) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(texto).then(() => exibirToast("📋 Mensagem copiada com sucesso!"));
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = texto;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                exibirToast("📋 Mensagem copiada com sucesso!");
             }
+        };
+
+        window.enviarWhatsAppGenerico = function(texto) {
+            window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(texto), '_blank');
+        };
+
+        window.abrirModulo = function(idModulo, btn) {
+            document.querySelectorAll('.module-section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.main-tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(idModulo).classList.add('active');
+            btn.classList.add('active');
+            if (idModulo === 'mod-report') {
+                rep_aplicarTotaisAutomaticos(true);
+                rep_sincronizarAuditoriaDeVeiculos(true);
+                rep_atualizarPreview();
+            }
+            if (idModulo === 'mod-nc') {
+                nc_atualizarTudoNC();
+            }
+        };
+
+        window.sincronizarDataGlobal = function(novaData) {
+            if (!novaData) return;
+            dataGlobal = novaData;
+            nc_trocarData(true);
+            off_trocarData();
+            rep_carregarDadosDataLocal(dataGlobal);
+        };
+
+        function obterTotalCampo2Offline(dt) {
+            if (dt === dataGlobal && Array.isArray(nc_lancamentos)) {
+                return nc_lancamentos.length;
+            }
+            const lista = nc_historicoGeral[dt] || [];
+            return lista.length;
         }
 
-        function inicializarApp() {
-            const hoje = new Date().toISOString().split('T')[0];
-            document.getElementById('dataLancamento').value = hoje;
-            document.getElementById('filtroDataUnica').value = hoje;
-            document.getElementById('filtroDataInicio').value = hoje;
-            document.getElementById('filtroDataFim').value = hoje;
-            dataAtual = hoje;
-
-            // Monitora o status de conexão da rede do celular
-            window.addEventListener('online', () => {
-                setCloudStatus("● Conectado - Sincronizando...", "warning");
-                sincronizarDadosPendentes();
-            });
-
-            window.addEventListener('offline', () => {
-                setCloudStatus("● Sem Internet (Modo Offline)", "offline");
-            });
-
-            if (!navigator.onLine) {
-                setCloudStatus("● Sem Internet (Modo Offline)", "offline");
+        function obterTotalCampo3ReinspecaoAuditoria(dt) {
+            if (dt === dataGlobal) {
+                const totDom = off_totaisFormularioAtual();
+                const somaDom = totDom.ok + totDom.nok;
+                if (somaDom > 0) return somaDom;
             }
-
-            // OUVINTE EM TEMPO REAL (Realtime / onSnapshot)
-            db.collection(COLLECTION_NAME).onSnapshot((snapshot) => {
-                cacheRegistros = [];
-                snapshot.forEach(doc => {
-                    cacheRegistros.push(doc.data());
-                });
-                cacheRegistros.sort((a,b) => new Date(a.data) - new Date(b.data));
-                
-                carregarDadosDataLocal(dataAtual);
-                if (document.getElementById('tab-historico').classList.contains('active')) {
-                    atualizarTabelaHistorico();
-                }
-                if (document.getElementById('tab-evolucao').classList.contains('active')) {
-                    calcularEvolucaoPersonalizada();
-                }
-                if (navigator.onLine) {
-                    setCloudStatus("● Nuvem Sincronizada", "success");
-                }
-            }, (error) => {
-                console.error("Erro no ouvinte da nuvem:", error);
-                setCloudStatus("● Erro de Conexão", "offline");
-            });
-        }
-
-        // Função para salvar dados pendentes no localStorage quando offline e reenviá-los ao reconectar
-        async function sincronizarDadosPendentes() {
-            const pendentesStr = localStorage.getItem(STORAGE_KEY_PENDENTES);
-            if (!pendentesStr) return;
-
-            try {
-                let pendentes = JSON.parse(pendentesStr);
-                if (pendentes.length > 0) {
-                    setCloudStatus("● Sincronizando dados pendentes...", "warning");
-                    for (let dados of pendentes) {
-                        await db.collection(COLLECTION_NAME).doc(dados.data).set(dados);
+            const reg = off_cacheGlobal[dt];
+            if (!reg) {
+                try {
+                    const loc = localStorage.getItem(`app_reparo_offline_${dt}`);
+                    if (loc) {
+                        const parsed = JSON.parse(loc);
+                        const totLoc = off_totaisRegistro(parsed);
+                        return totLoc.ok + totLoc.nok;
                     }
-                    localStorage.removeItem(STORAGE_KEY_PENDENTES);
-                    exibirToast("🔄 Dados offline sincronizados com sucesso!");
-                }
-            } catch (err) {
-                console.error("Erro ao sincronizar dados offline:", err);
+                } catch (e) {}
+                return 0;
             }
+            const tot = off_totaisRegistro(reg);
+            return tot.ok + tot.nok;
         }
 
-        function salvarOfflineLocalmente(dados) {
-            let pendentes = [];
-            const pendentesStr = localStorage.getItem(STORAGE_KEY_PENDENTES);
-            if (pendentesStr) {
-                try { pendentes = JSON.parse(pendentesStr); } catch(e) {}
-            }
-            
-            // Substitui caso já exista um registro offline para a mesma data
-            pendentes = pendentes.filter(p => p.data !== dados.data);
-            pendentes.push(dados);
-            
-            localStorage.setItem(STORAGE_KEY_PENDENTES, JSON.stringify(pendentes));
-        }
-
-        async function mudarDataLancamento() {
-            dataAtual = document.getElementById('dataLancamento').value;
-            carregarDadosDataLocal(dataAtual);
-        }
-
-        function carregarDadosDataLocal(dataStr) {
-            document.getElementById('container-auditoria').innerHTML = '';
-            document.getElementById('container-obs').innerHTML = '';
-
-            // Tenta buscar primeiro do cache da nuvem
-            let registroEncontrado = cacheRegistros.find(r => r.data === dataStr);
-
-            // Se não estiver na nuvem, verifica se foi salvo localmente offline
-            if (!registroEncontrado) {
-                const pendentesStr = localStorage.getItem(STORAGE_KEY_PENDENTES);
-                if (pendentesStr) {
-                    try {
-                        const pendentes = JSON.parse(pendentesStr);
-                        registroEncontrado = pendentes.find(p => p.data === dataStr);
-                    } catch(e) {}
+        function obterListaVeiculosAuditoriaDaData(dt) {
+            if (dt === dataGlobal) {
+                const cards = document.querySelectorAll('#off_container-auditoria .dynamic-row-card');
+                if (cards.length > 0) {
+                    return Array.from(cards)
+                        .map(card => ({
+                            veiculo: card.querySelector('.off-aud-ch').value.trim(),
+                            tempo: (card.querySelector('.off-aud-tp').value || '').trim() || '30 min',
+                            status: (card.querySelector('.off-aud-st').value || 'OK').toUpperCase() === 'NOK' ? 'NOK' : 'OK',
+                            problema: (card.querySelector('.off-aud-mot').value || '').trim()
+                        }))
+                        .filter(item => item.veiculo !== '');
                 }
             }
 
-            if (!registroEncontrado) {
-                document.getElementById('objetivo').value = '';
-                document.getElementById('prodRealizada').value = '';
-                document.getElementById('bolhas').value = '';
-                document.getElementById('carrosNOK').value = '';
-                document.getElementById('liberacaoOffline').value = 0;
-                document.getElementById('reinspecao').value = 0;
-                document.getElementById('tratativas').value = 0;
-                document.getElementById('top1_desc').value = '';
-                document.getElementById('top1_qtd').value = '';
-                document.getElementById('top2_desc').value = '';
-                document.getElementById('top2_qtd').value = '';
-                document.getElementById('top3_desc').value = '';
-                document.getElementById('top3_qtd').value = '';
-                document.getElementById('ocorrencia').value = '';
-                document.getElementById('acao').value = '';
-                adicionarCampoAuditoria('VK072138', 'OK', '30 min', '');
-                adicionarCampoObs('Baixo volume na linha.');
-            } else {
-                const d = registroEncontrado;
-                document.getElementById('objetivo').value = d.objetivo;
-                document.getElementById('prodRealizada').value = d.prodRealizadaStr;
-                document.getElementById('bolhas').value = d.bolhas;
-                document.getElementById('carrosNOK').value = d.carrosNOK;
-                document.getElementById('liberacaoOffline').value = d.liberacaoOffline;
-                document.getElementById('reinspecao').value = d.reinspecao;
-                document.getElementById('tratativas').value = d.tratativas !== undefined ? d.tratativas : (d.reparos || 0);
-                document.getElementById('top1_desc').value = d.top1_desc;
-                document.getElementById('top1_qtd').value = d.top1_qtd;
-                document.getElementById('top2_desc').value = d.top2_desc;
-                document.getElementById('top2_qtd').value = d.top2_qtd;
-                document.getElementById('top3_desc').value = d.top3_desc;
-                document.getElementById('top3_qtd').value = d.top3_qtd;
-                document.getElementById('ocorrencia').value = d.ocorrencia;
-                document.getElementById('acao').value = d.acao;
-
-                if (d.auditoria && d.auditoria.length > 0) {
-                    d.auditoria.forEach(item => {
-                        if (typeof item === 'object') {
-                            adicionarCampoAuditoria(item.veiculo, item.status, item.tempo || '30 min', item.problema);
-                        } else {
-                            adicionarCampoAuditoria(item, 'OK', '30 min', '');
-                        }
-                    });
-                } else {
-                    adicionarCampoAuditoria();
-                }
-
-                if (d.obs) d.obs.forEach(v => adicionarCampoObs(v));
+            let reg = off_cacheGlobal[dt];
+            if (!reg) {
+                try {
+                    const loc = localStorage.getItem(`app_reparo_offline_${dt}`);
+                    if (loc) reg = JSON.parse(loc);
+                } catch (e) {}
             }
-            atualizarPreview();
+            if (!reg) return [];
+            const objs = reg.auditoriaObjs || reg.auditoria30Objs || [];
+            return objs
+                .filter(item => (item.chassi || '').trim() !== '')
+                .map(item => ({
+                    veiculo: item.chassi.trim(),
+                    tempo: (item.tempo || '').trim() || '30 min',
+                    status: (item.status || 'OK').toUpperCase() === 'NOK' ? 'NOK' : 'OK',
+                    problema: (item.motivo || '').trim()
+                }));
         }
 
-        function trocarAba(aba, event) {
-            document.querySelectorAll('.container').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.nav-tabs .tab-btn').forEach(el => el.classList.remove('active'));
-            document.getElementById('tab-' + aba).classList.add('active');
-            if(event && event.currentTarget) event.currentTarget.classList.add('active');
+        window.rep_sincronizarAuditoriaDeVeiculos = function(forcarSubstituicao = true) {
+            if (!dataGlobal) return;
+            const veiculos = obterListaVeiculosAuditoriaDaData(dataGlobal);
+            const container = document.getElementById('rep_container-auditoria');
 
-            if (aba === 'historico') atualizarTabelaHistorico();
-            if (aba === 'evolucao') calcularEvolucaoPersonalizada();
-        }
-
-        function mudarTipoFiltro() {
-            const tipo = document.getElementById('tipoFiltro').value;
-            document.getElementById('boxDataUnica').style.display = (tipo === 'dia' || tipo === 'mes') ? 'block' : 'none';
-            document.getElementById('boxDataInicio').style.display = (tipo === 'personalizado') ? 'block' : 'none';
-            document.getElementById('boxDataFim').style.display = (tipo === 'personalizado') ? 'block' : 'none';
-            calcularEvolucaoPersonalizada();
-        }
-
-        function adicionarCampoAuditoria(veiculoVal = '', statusVal = 'OK', tempoVal = '30 min', problemaVal = '') {
-            const container = document.getElementById('container-auditoria');
-            const row = document.createElement('div');
-            row.className = 'dynamic-row';
-            
-            const displayProblema = statusVal === 'NOK' ? 'block' : 'none';
-            
-            const temposPadrao = ["15 min", "30 min", "45 min", "60 min", "90 min", "120 min", "3 horas", "4 horas"];
-            let selectVal = temposPadrao.includes(tempoVal) ? tempoVal : "outro";
-            let customDisplay = selectVal === "outro" ? "block" : "none";
-            let customVal = selectVal === "outro" ? tempoVal : "";
-
-            row.innerHTML = `
-                <div class="dynamic-inputs">
-                    <input type="text" class="input-auditoria-veiculo" value="${veiculoVal}" placeholder="Ex: Chassi / VIN" oninput="atualizarPreview()">
-                    <select class="tempo-select input-auditoria-tempo-select" onchange="tratarMudancaTempo(this); atualizarPreview()">
-                        <option value="15 min" ${selectVal === '15 min' ? 'selected' : ''}>15 min</option>
-                        <option value="30 min" ${selectVal === '30 min' ? 'selected' : ''}>30 min</option>
-                        <option value="45 min" ${selectVal === '45 min' ? 'selected' : ''}>45 min</option>
-                        <option value="60 min" ${selectVal === '60 min' ? 'selected' : ''}>60 min</option>
-                        <option value="90 min" ${selectVal === '90 min' ? 'selected' : ''}>90 min</option>
-                        <option value="120 min" ${selectVal === '120 min' ? 'selected' : ''}>120 min</option>
-                        <option value="3 horas" ${selectVal === '3 horas' ? 'selected' : ''}>3 horas</option>
-                        <option value="4 horas" ${selectVal === '4 horas' ? 'selected' : ''}>4 horas</option>
-                        <option value="outro" ${selectVal === 'outro' ? 'selected' : ''}>Outro (Personalizado)...</option>
-                    </select>
-                    <select class="input-auditoria-status" onchange="tratarMudancaStatus(this); atualizarPreview()">
-                        <option value="OK" ${statusVal === 'OK' ? 'selected' : ''}>OK</option>
-                        <option value="NOK" ${statusVal === 'NOK' ? 'selected' : ''}>NOK</option>
-                    </select>
-                    <button class="btn-remove" onclick="removerCampo(this); atualizarPreview()">✕</button>
-                </div>
-                <input type="text" class="tempo-custom-input input-auditoria-tempo-custom" value="${customVal}" placeholder="Digite o tempo (Ex: 50 min)..." style="display: ${customDisplay};" oninput="atualizarPreview()">
-                <input type="text" class="problema-input input-auditoria-problema" value="${problemaVal}" placeholder="Descreva o problema encontrado (NOK)..." style="display: ${displayProblema};" oninput="atualizarPreview()">
-            `;
-            container.appendChild(row);
-        }
-
-        function tratarMudancaTempo(selectEl) {
-            const row = selectEl.closest('.dynamic-row');
-            const customInput = row.querySelector('.tempo-custom-input');
-            if (selectEl.value === 'outro') {
-                customInput.style.display = 'block';
-                customInput.focus();
-            } else {
-                customInput.style.display = 'none';
-                customInput.value = '';
-            }
-        }
-
-        function tratarMudancaStatus(selectEl) {
-            const row = selectEl.closest('.dynamic-row');
-            const problemaInput = row.querySelector('.problema-input');
-            if (selectEl.value === 'NOK') {
-                problemaInput.style.display = 'block';
-                problemaInput.focus();
-            } else {
-                problemaInput.style.display = 'none';
-                problemaInput.value = '';
-            }
-        }
-
-        function adicionarCampoObs(val = '') {
-            const container = document.getElementById('container-obs');
-            const row = document.createElement('div');
-            row.className = 'dynamic-row';
-            row.innerHTML = `
-                <div class="dynamic-inputs">
-                    <input type="text" class="input-obs" value="${val}" placeholder="Ex: Observação..." oninput="atualizarPreview()">
-                    <button class="btn-remove" onclick="removerCampo(this); atualizarPreview()">✕</button>
-                </div>
-            `;
-            container.appendChild(row);
-            atualizarPreview();
-        }
-
-        function removerCampo(btn) { btn.closest('.dynamic-row').remove(); atualizarPreview(); }
-
-        function calcularFTT(prodRealizadaNum, carrosNOK) {
-            if (!prodRealizadaNum || prodRealizadaNum <= 0) return "0.0%";
-            const ok = Math.max(0, prodRealizadaNum - (carrosNOK || 0));
-            const fttVal = (ok / prodRealizadaNum) * 100;
-            return fttVal.toFixed(1) + "%";
-        }
-
-        function extrairDadosFormulario() {
-            const auditoriaItems = Array.from(document.querySelectorAll('.dynamic-row')).map(row => {
-                const v = row.querySelector('.input-auditoria-veiculo');
-                const ts = row.querySelector('.input-auditoria-tempo-select');
-                const tc = row.querySelector('.input-auditoria-tempo-custom');
-                const s = row.querySelector('.input-auditoria-status');
-                const p = row.querySelector('.input-auditoria-problema');
-                
-                if (v && s && ts) {
-                    const veiculo = v.value.trim();
-                    let tempo = ts.value === 'outro' && tc ? tc.value.trim() : ts.value;
-                    const status = s.value;
-                    const problema = p ? p.value.trim() : '';
-                    if (veiculo) {
-                        return { veiculo, tempo: tempo || '30 min', status, problema };
-                    }
-                }
-                return null;
-            }).filter(Boolean);
-
-            const prodNum = parseFloat(document.getElementById('prodRealizada').value) || 0;
-            const nokNum = parseFloat(document.getElementById('carrosNOK').value) || 0;
-
-            return {
-                data: dataAtual,
-                objetivo: parseFloat(document.getElementById('objetivo').value) || 0,
-                prodRealizadaStr: document.getElementById('prodRealizada').value,
-                prodRealizadaNum: prodNum,
-                bolhas: parseFloat(document.getElementById('bolhas').value) || 0,
-                carrosNOK: nokNum,
-                fttStr: calcularFTT(prodNum, nokNum),
-                liberacaoOffline: parseFloat(document.getElementById('liberacaoOffline').value) || 0,
-                reinspecao: parseFloat(document.getElementById('reinspecao').value) || 0,
-                tratativas: parseFloat(document.getElementById('tratativas').value) || 0,
-                top1_desc: document.getElementById('top1_desc').value,
-                top1_qtd: document.getElementById('top1_qtd').value,
-                top2_desc: document.getElementById('top2_desc').value,
-                top2_qtd: document.getElementById('top2_qtd').value,
-                top3_desc: document.getElementById('top3_desc').value,
-                top3_qtd: document.getElementById('top3_qtd').value,
-                ocorrencia: document.getElementById('ocorrencia').value,
-                acao: document.getElementById('acao').value,
-                auditoria: auditoriaItems,
-                obs: Array.from(document.querySelectorAll('.input-obs')).map(i => i.value).filter(Boolean)
-            };
-        }
-
-        function validarPreenchimentoObrigatorio() {
-            const objetivo = document.getElementById('objetivo').value.trim();
-            const prodRealizada = document.getElementById('prodRealizada').value.trim();
-            const bolhas = document.getElementById('bolhas').value.trim();
-            const carrosNOK = document.getElementById('carrosNOK').value.trim();
-
-            if (!objetivo || !prodRealizada || bolhas === '' || carrosNOK === '') {
-                alert("⚠️ Atenção: Preencha todos os campos obrigatórios antes de salvar!");
-                return false;
-            }
-            return true;
-        }
-
-        async function salvarDadosDoDia() {
-            if (!dataAtual) return;
-            if (!validarPreenchimentoObrigatorio()) return;
-
-            const dados = extrairDadosFormulario();
-            
-            // Verifica se o celular está sem internet
-            if (!navigator.onLine) {
-                salvarOfflineLocalmente(dados);
-                exibirToast("💾 Sem internet! Dados salvos no aparelho. Serão enviados ao reconectar.");
-                setCloudStatus("● Salvo Offline (Aguardando Rede)", "offline");
+            if (!forcarSubstituicao && container.children.length > 0 && veiculos.length === 0) {
                 return;
             }
 
-            setCloudStatus("● Salvando...", "warning");
-            
+            container.innerHTML = '';
+            veiculos.forEach(v => {
+                rep_adicionarCampoAuditoria(v.veiculo, v.status, v.tempo, v.problema, false);
+            });
+            rep_atualizarPreview();
+        };
+
+        window.rep_aplicarTotaisAutomaticos = function(forcarSobrescrita = true) {
+            if (!dataGlobal) return;
+            const totalCampo2 = obterTotalCampo2Offline(dataGlobal);
+            const totalCampo3 = obterTotalCampo3ReinspecaoAuditoria(dataGlobal);
+
+            const elCampo2 = document.getElementById('rep_liberacaoOffline');
+            const elCampo3 = document.getElementById('rep_reinspecao');
+
+            if (elCampo2 && (forcarSobrescrita || totalCampo2 > 0 || Number(elCampo2.value) === 0)) {
+                elCampo2.value = totalCampo2;
+            }
+            if (elCampo3 && (forcarSobrescrita || totalCampo3 > 0 || Number(elCampo3.value) === 0)) {
+                elCampo3.value = totalCampo3;
+            }
+            rep_atualizarPreview();
+        };
+
+        // ==================================================================
+        // MÓDULO 2: OFFLINE DE INFILTRAÇÃO (NC)
+        // ==================================================================
+        const NC_STORAGE_KEY = 'app_nao_conformidades_historico';
+        let nc_historicoGeral = {};
+        try {
+            nc_historicoGeral = JSON.parse(localStorage.getItem(NC_STORAGE_KEY)) || {};
+        } catch (e) {
+            nc_historicoGeral = {};
+        }
+        let nc_lancamentos = [];
+
+        onSnapshot(docRefNC, (snap) => {
+            if (Date.now() - nc_ultimaAlteracaoLocal < 3000) {
+                setBadgeStatus('status-nc', '● Offline: Sincronizado', 'ok');
+                return;
+            }
+            if (snap.exists()) {
+                const nuvem = snap.data().historico || {};
+                if (Object.keys(nuvem).length > 0) {
+                    const mesclado = { ...nuvem };
+                    if (dataGlobal && Array.isArray(nc_lancamentos) && nc_lancamentos.length > 0) {
+                        const nuvemData = mesclado[dataGlobal] || [];
+                        if (nuvemData.length < nc_lancamentos.length) {
+                            mesclado[dataGlobal] = [...nc_lancamentos];
+                        }
+                    }
+                    nc_historicoGeral = mesclado;
+                    localStorage.setItem(NC_STORAGE_KEY, JSON.stringify(nc_historicoGeral));
+                }
+                nc_trocarData(false);
+                setBadgeStatus('status-nc', '● Offline: Sincronizado', 'ok');
+            }
+        }, () => setBadgeStatus('status-nc', '● Offline: Desconectado', 'off'));
+
+        async function nc_sincronizarNuvem() {
+            setBadgeStatus('status-nc', '● Offline: Salvando...', 'sync');
             try {
-                await db.collection(COLLECTION_NAME).doc(dataAtual).set(dados);
-                exibirToast("✅ Dados salvos na nuvem com sucesso!");
-                setCloudStatus("● Nuvem Sincronizada", "success");
-                atualizarPreview();
-            } catch (error) {
-                console.error("Erro ao salvar no Firebase, salvando localmente de backup:", error);
-                salvarOfflineLocalmente(dados);
-                exibirToast("⚠️ Erro de rede. Dados salvos localmente no celular!");
-                setCloudStatus("● Salvo Offline (Erro de Rede)", "offline");
+                await setDoc(docRefNC, { historico: nc_historicoGeral, ultima_atualizacao: new Date().toISOString() }, { merge: true });
+                setBadgeStatus('status-nc', '● Offline: Sincronizado', 'ok');
+            } catch (e) {
+                setBadgeStatus('status-nc', '● Offline: Salvo Local', 'off');
             }
         }
 
-        function atualizarPreview() {
-            document.getElementById('preview').innerText = gerarTextoWhatsApp();
+        function nc_montarListaComRascunhoAtual() {
+            const base = Array.isArray(nc_lancamentos) ? [...nc_lancamentos] : [];
+            const editId = document.getElementById('nc_edit_id')?.value || '';
+            if (editId) return base;
+
+            const chassi = (document.getElementById('nc_chassi')?.value || '').trim();
+            const modelo = document.getElementById('nc_modelo')?.value || 'HA2';
+            const local = (document.getElementById('nc_local')?.value || '').trim();
+            const nc = document.getElementById('nc_defeito')?.value || '';
+            const tratativa = document.getElementById('nc_tratativa')?.value || '';
+
+            if (chassi || local || nc || tratativa) {
+                base.push({
+                    id: '__rascunho__',
+                    modelo,
+                    chassi: chassi || 'CHASSI PENDENTE',
+                    local,
+                    nc,
+                    tratativa
+                });
+            }
+            return base;
         }
 
-        function gerarTextoWhatsApp() {
-            const d = extrairDadosFormulario();
-            
-            const auditoriaText = d.auditoria.map(item => {
-                if (item.status === 'NOK') {
-                    return `• ${item.veiculo} (${item.tempo}) - NOK ❌ (${item.problema || 'Sem descrição'})`;
+        window.nc_atualizarPreviaEmTempoReal = function() {
+            const previewEl = document.getElementById('nc_preview');
+            if (previewEl) {
+                previewEl.innerText = nc_gerarTextoWhatsApp(nc_montarListaComRascunhoAtual());
+            }
+        };
+
+        function nc_atualizarTudoNC() {
+            nc_renderizarLista();
+            nc_atualizarIndicadoresSuperiores();
+            nc_atualizarPreviaEmTempoReal();
+            rep_aplicarTotaisAutomaticos(true);
+        }
+
+        function nc_salvarMemoria() {
+            if (!dataGlobal) {
+                dataGlobal = document.getElementById('globalData').value || obterDataHoje();
+            }
+            nc_ultimaAlteracaoLocal = Date.now();
+            nc_historicoGeral[dataGlobal] = [...nc_lancamentos];
+            try {
+                localStorage.setItem(NC_STORAGE_KEY, JSON.stringify(nc_historicoGeral));
+            } catch (e) {}
+            nc_atualizarTudoNC();
+            nc_sincronizarNuvem();
+        }
+
+        window.nc_trocarData = function(resetForm = true) {
+            if (resetForm) nc_resetarFormulario();
+            nc_lancamentos = Array.isArray(nc_historicoGeral[dataGlobal]) ? [...nc_historicoGeral[dataGlobal]] : [];
+            nc_atualizarTudoNC();
+        };
+
+        window.nc_verificarChassiExistente = function() {
+            const c = document.getElementById('nc_chassi').value.trim().toUpperCase();
+            if (!c) return;
+            const ex = nc_lancamentos.find(i => (i.chassi || '').toUpperCase() === c);
+            if (ex) document.getElementById('nc_modelo').value = ex.modelo;
+        };
+
+        window.nc_tratarMudancaPeriodoKpi = function() {
+            const opc = document.getElementById('nc_kpiPeriodoSelect').value;
+            document.getElementById('nc_kpiCustomDates').style.display = (opc === 'INTERVALO') ? 'flex' : 'none';
+            nc_atualizarIndicadoresSuperiores();
+        };
+
+        window.nc_atualizarIndicadoresSuperiores = function() {
+            const opc = document.getElementById('nc_kpiPeriodoSelect').value;
+            let itens = [];
+            const hoje = new Date();
+            const mapaBase = { ...nc_historicoGeral };
+            if (dataGlobal) mapaBase[dataGlobal] = [...nc_lancamentos];
+
+            if (opc === 'DIA_SELECIONADO') itens = mapaBase[dataGlobal] || [];
+            else if (opc === 'HOJE') itens = mapaBase[obterDataHoje()] || [];
+            else if (opc === 'MES_ATUAL') {
+                const am = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+                Object.keys(mapaBase).forEach(dt => { if (dt.startsWith(am)) itens = itens.concat(mapaBase[dt] || []); });
+            } else if (opc === 'MES_ANTERIOR') {
+                let m = hoje.getMonth(), a = hoje.getFullYear();
+                if (m === 0) { m = 12; a--; }
+                const am = `${a}-${String(m).padStart(2, '0')}`;
+                Object.keys(mapaBase).forEach(dt => { if (dt.startsWith(am)) itens = itens.concat(mapaBase[dt] || []); });
+            } else if (opc === 'INTERVALO') {
+                const ini = document.getElementById('nc_kpiDataInicio').value;
+                const fim = document.getElementById('nc_kpiDataFim').value;
+                Object.keys(mapaBase).forEach(dt => { if ((!ini || dt >= ini) && (!fim || dt <= fim)) itens = itens.concat(mapaBase[dt] || []); });
+            } else {
+                Object.keys(mapaBase).forEach(dt => { itens = itens.concat(mapaBase[dt] || []); });
+            }
+
+            const contarUnicos = (arr) => new Set(arr.filter(i => i.chassi).map(i => i.chassi.trim().toUpperCase())).size;
+            let todos = [];
+            Object.keys(mapaBase).forEach(dt => { todos = todos.concat(mapaBase[dt] || []); });
+
+            document.getElementById('nc_kpi-total').innerText = contarUnicos(itens);
+            document.getElementById('nc_kpi-ha2').innerText = contarUnicos(itens.filter(i => i.modelo === 'HA2'));
+            document.getElementById('nc_kpi-sa6').innerText = contarUnicos(itens.filter(i => i.modelo === 'SA6'));
+            document.getElementById('nc_kpi-eqe').innerText = contarUnicos(itens.filter(i => i.modelo === 'EQE'));
+            document.getElementById('nc_kpi-sa2').innerText = contarUnicos(itens.filter(i => i.modelo === 'SA2'));
+            document.getElementById('nc_kpi-sc3h').innerText = contarUnicos(itens.filter(i => i.modelo === 'SC3H'));
+            document.getElementById('nc_kpi-geral').innerText = `${contarUnicos(todos)} Carros`;
+        };
+
+        window.nc_salvarParcial = function() {
+            const editId = document.getElementById('nc_edit_id').value;
+            const modelo = document.getElementById('nc_modelo').value;
+            const chassi = document.getElementById('nc_chassi').value.trim();
+            const local = document.getElementById('nc_local').value.trim();
+            const nc = document.getElementById('nc_defeito').value;
+            const tratativa = document.getElementById('nc_tratativa').value;
+            if (!chassi) { alert("Preencha ao menos o Chassi!"); return; }
+
+            if (editId) {
+                const idx = nc_lancamentos.findIndex(i => String(i.id) === String(editId));
+                if (idx !== -1) nc_lancamentos[idx] = { id: nc_lancamentos[idx].id, modelo, chassi, local, nc, tratativa };
+                nc_resetarFormulario();
+            } else {
+                nc_lancamentos.push({ id: Date.now() + Math.random(), modelo, chassi, local, nc, tratativa });
+                document.getElementById('nc_local').value = '';
+                document.getElementById('nc_defeito').value = '';
+                document.getElementById('nc_tratativa').value = '';
+                document.getElementById('nc_local').focus();
+            }
+            nc_salvarMemoria();
+            exibirToast("💾 Salvo parcialmente (chassi fixado)!");
+        };
+
+        window.nc_cadastrarCarro = function() {
+            const editId = document.getElementById('nc_edit_id').value;
+            const modelo = document.getElementById('nc_modelo').value;
+            const chassi = document.getElementById('nc_chassi').value.trim();
+            const local = document.getElementById('nc_local').value.trim();
+            const nc = document.getElementById('nc_defeito').value;
+            const tratativa = document.getElementById('nc_tratativa').value;
+            if (!chassi) { alert("Preencha ao menos o Chassi!"); return; }
+
+            if (editId) {
+                const idx = nc_lancamentos.findIndex(i => String(i.id) === String(editId));
+                if (idx !== -1) nc_lancamentos[idx] = { id: nc_lancamentos[idx].id, modelo, chassi, local, nc, tratativa };
+            } else {
+                nc_lancamentos.push({ id: Date.now() + Math.random(), modelo, chassi, local, nc, tratativa });
+            }
+            nc_resetarFormulario();
+            nc_salvarMemoria();
+            exibirToast("📥 Lançado e concluído no relatório!");
+        };
+
+        window.nc_prepararEdicao = function(id) {
+            const item = nc_lancamentos.find(i => String(i.id) === String(id));
+            if (!item) return;
+            document.getElementById('nc_edit_id').value = item.id;
+            document.getElementById('nc_modelo').value = item.modelo;
+            document.getElementById('nc_chassi').value = item.chassi;
+            document.getElementById('nc_local').value = item.local;
+            document.getElementById('nc_defeito').value = item.nc;
+            document.getElementById('nc_tratativa').value = item.tratativa;
+            const btn = document.getElementById('nc_btn-submit');
+            btn.innerText = "💾 Salvar Alteração";
+            btn.className = "btn-tool btn-amber btn-full";
+            nc_atualizarPreviaEmTempoReal();
+        };
+
+        window.nc_resetarFormulario = function() {
+            document.getElementById('nc_edit_id').value = '';
+            document.getElementById('nc_chassi').value = '';
+            document.getElementById('nc_local').value = '';
+            document.getElementById('nc_defeito').value = '';
+            document.getElementById('nc_tratativa').value = '';
+            const btn = document.getElementById('nc_btn-submit');
+            btn.innerText = "📥 Lançar e Concluir no Relatório";
+            btn.className = "btn-tool btn-blue btn-full";
+            nc_atualizarPreviaEmTempoReal();
+        };
+
+        window.nc_removerLancamento = function(id) {
+            nc_lancamentos = nc_lancamentos.filter(i => String(i.id) !== String(id));
+            if (String(document.getElementById('nc_edit_id').value) === String(id)) nc_resetarFormulario();
+            nc_salvarMemoria();
+        };
+
+        window.nc_limparDia = function() {
+            if (confirm(`Apagar todos os lançamentos de Offline de Infiltração do dia ${formatarDataBR(dataGlobal)}?`)) {
+                nc_ultimaAlteracaoLocal = Date.now();
+                nc_lancamentos = [];
+                delete nc_historicoGeral[dataGlobal];
+                localStorage.setItem(NC_STORAGE_KEY, JSON.stringify(nc_historicoGeral));
+                nc_resetarFormulario();
+                nc_atualizarTudoNC();
+                nc_sincronizarNuvem();
+            }
+        };
+
+        function nc_renderizarLista() {
+            const c = document.getElementById('nc_lista-lancados');
+            document.getElementById('nc_total-registros').innerText = `${nc_lancamentos.length} itens`;
+            if (nc_lancamentos.length === 0) {
+                c.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:12px;">Nenhum veículo lançado em ${formatarDataBR(dataGlobal)}.</div>`;
+                return;
+            }
+            c.innerHTML = nc_lancamentos.map(item => `
+                <div class="car-item">
+                    <div class="action-btns">
+                        <button class="btn-tool btn-amber" style="padding:4px 8px;" onclick="nc_prepararEdicao('${item.id}')">✏️</button>
+                        <button class="btn-tool btn-red" style="padding:4px 8px;" onclick="nc_removerLancamento('${item.id}')">✕</button>
+                    </div>
+                    <div class="car-info">
+                        <strong style="color:var(--accent-amber);">[${item.modelo}] ${item.chassi}</strong><br>
+                        <strong>Local:</strong> ${item.local || '-'} | <strong>NC:</strong> ${item.nc || '-'} | <strong>Tratativa:</strong> ${item.tratativa || '-'}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        window.nc_gerarTextoWhatsApp = function(listaCustom = null) {
+            const listaAtual = Array.isArray(listaCustom) ? listaCustom : (Array.isArray(nc_lancamentos) ? nc_lancamentos : []);
+            const modelos = ['HA2', 'SA6', 'EQE', 'SA2', 'SC3H'];
+            let text = `📋 OFFLINE DE INFILTRAÇÃO - ${formatarDataBR(dataGlobal)} (${listaAtual.length} itens)\n`;
+            modelos.forEach(m => {
+                const itens = listaAtual.filter(i => i.modelo === m);
+                if (itens.length > 0) {
+                    text += `\n🔹 MODELO: ${m} (${itens.length})\n`;
+                    const porChassi = {};
+                    itens.forEach(i => {
+                        const chave = (i.chassi || '').trim();
+                        (porChassi[chave] = porChassi[chave] || []).push(i);
+                    });
+                    let cnt = 1;
+                    Object.keys(porChassi).forEach(ch => {
+                        const lista = porChassi[ch];
+                        if (lista.length === 1) {
+                            const i = lista[0];
+                            text += `${cnt}. ${ch} | ${i.local || '-'} | ${i.nc || '-'} ➔ ${i.tratativa || '-'}\n`;
+                        } else {
+                            text += `${cnt}. ${ch}:\n`;
+                            lista.forEach((i, idx) => { text += `   - [${idx + 1}] ${i.local || '-'} | ${i.nc || '-'} ➔ ${i.tratativa || '-'}\n`; });
+                        }
+                        cnt++;
+                    });
                 }
-                return `• ${item.veiculo} (${item.tempo}) - OK ✅`;
-            }).join('\n');
+            });
+            const resumo = modelos.map(m => {
+                const qtd = new Set(listaAtual.filter(i => i.modelo === m && i.chassi).map(i => i.chassi.trim().toUpperCase())).size;
+                return qtd > 0 ? `${m}: ${qtd}` : null;
+            }).filter(Boolean).join(' | ');
+            text += `\n📊 Resumo: ${resumo || 'Sem lançamentos'}`;
+            return text;
+        };
 
+        window.nc_abrirModalExportacao = function() {
+            modoExportacaoAtual = 'NC';
+            document.getElementById('modalExportTitle').innerText = '📊 Exportar Offline de Infiltração (.xlsx)';
+            document.getElementById('modalExport').style.display = 'flex';
+        };
+
+        window.nc_importarDeExcel = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const wb = XLSX.read(e.target.result, { type: 'binary' });
+                    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                    let count = 0;
+                    rows.forEach(r => {
+                        let dt = r["Data"] || r["data"] || "";
+                        let iso = "";
+                        if (typeof dt === 'string' && dt.includes('/')) {
+                            const p = dt.split('/');
+                            if (p.length === 3) iso = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+                        } else if (typeof dt === 'string' && dt.includes('-')) {
+                            iso = dt;
+                        } else if (typeof dt === 'number') {
+                            iso = new Date(Math.round((dt - 25569) * 86400 * 1000)).toISOString().slice(0, 10);
+                        }
+                        if (!iso) iso = obterDataHoje();
+                        const item = {
+                            id: Date.now() + Math.random(),
+                            modelo: r["Modelo"] || r["modelo"] || "HA2",
+                            chassi: String(r["Chassi"] || r["chassi"] || "").trim(),
+                            local: String(r["Local"] || r["local"] || "").trim(),
+                            nc: String(r["Não Conformidade"] || r["Nao Conformidade"] || r["nc"] || "").trim(),
+                            tratativa: String(r["Tratativa"] || r["tratativa"] || "").trim()
+                        };
+                        if (item.chassi) {
+                            if (!nc_historicoGeral[iso]) nc_historicoGeral[iso] = [];
+                            nc_historicoGeral[iso].push(item);
+                            count++;
+                        }
+                    });
+                    if (count > 0) {
+                        nc_ultimaAlteracaoLocal = Date.now();
+                        localStorage.setItem(NC_STORAGE_KEY, JSON.stringify(nc_historicoGeral));
+                        nc_trocarData(false);
+                        nc_sincronizarNuvem();
+                        exibirToast(`✅ ${count} registros importados!`);
+                    }
+                } catch (err) { alert("Erro ao ler Excel."); }
+                event.target.value = "";
+            };
+            reader.readAsBinaryString(file);
+        };
+
+        // ==================================================================
+        // MÓDULO 1: PRODUÇÃO DIARIA INFILTRAÇÃO
+        // ==================================================================
+        const REP_COLLECTION = "reports_infiltracao";
+        const REP_PENDENTES_KEY = "reports_pendentes_offline";
+        let rep_cacheRegistros = [];
+
+        onSnapshot(collection(dbReport, REP_COLLECTION), (snap) => {
+            rep_cacheRegistros = [];
+            snap.forEach(d => rep_cacheRegistros.push(d.data()));
+            rep_cacheRegistros.sort((a, b) => new Date(a.data) - new Date(b.data));
+            rep_atualizarTabelaHistorico();
+            rep_calcularEvolucao();
+            setBadgeStatus('status-rep', '● Produção: Sincronizado', 'ok');
+        }, () => setBadgeStatus('status-rep', '● Produção: Offline', 'off'));
+
+        window.rep_trocarAba = function(aba, btn) {
+            ['editor', 'historico', 'evolucao'].forEach(id => {
+                document.getElementById('rep-tab-' + id).style.display = (id === aba) ? (id === 'editor' ? 'grid' : 'block') : 'none';
+            });
+            btn.parentElement.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            if (aba === 'historico') rep_atualizarTabelaHistorico();
+            if (aba === 'evolucao') rep_calcularEvolucao();
+        };
+
+        window.rep_adicionarCampoAuditoria = function(v = '', st = 'OK', tp = '30 min', prob = '', atualizarPreview = true) {
+            const c = document.getElementById('rep_container-auditoria');
+            const row = document.createElement('div');
+            row.className = 'dynamic-row';
+            const tempos = ["5 min","10 min","15 min","20 min","30 min","40 min","45 min","50 min","60 min","90 min","120 min","3 horas","4 horas"];
+            const selVal = tempos.includes(tp) ? tp : "outro";
+            row.innerHTML = `
+                <div class="dynamic-inputs">
+                    <input type="text" class="rep-aud-veic" style="flex:2;" value="${v}" placeholder="Chassi / VIN" oninput="rep_atualizarPreview()">
+                    <select class="rep-aud-tp-sel" style="flex:1.2;" onchange="this.closest('.dynamic-row').querySelector('.rep-aud-tp-cus').style.display=(this.value==='outro'?'block':'none'); rep_atualizarPreview()">
+                        ${tempos.map(t => `<option value="${t}" ${selVal===t?'selected':''}>${t}</option>`).join('')}
+                        <option value="outro" ${selVal==='outro'?'selected':''}>Outro...</option>
+                    </select>
+                    <select class="rep-aud-st" style="flex:1;" onchange="this.closest('.dynamic-row').querySelector('.rep-aud-prob').style.display=(this.value==='NOK'?'block':'none'); rep_atualizarPreview()">
+                        <option value="OK" ${st==='OK'?'selected':''}>OK</option>
+                        <option value="NOK" ${st==='NOK'?'selected':''}>NOK</option>
+                    </select>
+                    <button type="button" class="btn-tool btn-red" onclick="this.closest('.dynamic-row').remove(); rep_atualizarPreview()">✕</button>
+                </div>
+                <input type="text" class="rep-aud-tp-cus" value="${selVal==='outro'?tp:''}" placeholder="Tempo personalizado..." style="display:${selVal==='outro'?'block':'none'};" oninput="rep_atualizarPreview()">
+                <input type="text" class="rep-aud-prob" value="${prob}" placeholder="Descreva o problema (NOK)..." style="display:${st==='NOK'?'block':'none'};" oninput="rep_atualizarPreview()">
+            `;
+            c.appendChild(row);
+            if (atualizarPreview) rep_atualizarPreview();
+        };
+
+        window.rep_adicionarCampoObs = function(val = '') {
+            const c = document.getElementById('rep_container-obs');
+            const row = document.createElement('div');
+            row.className = 'dynamic-row';
+            row.innerHTML = `
+                <div class="dynamic-inputs">
+                    <input type="text" class="rep-obs-in" style="flex:1;" value="${val}" placeholder="Observação..." oninput="rep_atualizarPreview()">
+                    <button type="button" class="btn-tool btn-red" onclick="this.closest('.dynamic-row').remove(); rep_atualizarPreview()">✕</button>
+                </div>
+            `;
+            c.appendChild(row);
+            rep_atualizarPreview();
+        };
+
+        function rep_calcularFTT(prod, nok) {
+            if (!prod || prod <= 0) return "0.0%";
+            return ((Math.max(0, prod - (nok || 0)) / prod) * 100).toFixed(1) + "%";
+        }
+
+        function rep_extrairDados() {
+            const aud = Array.from(document.querySelectorAll('#rep_container-auditoria .dynamic-row')).map(r => {
+                const veiculo = r.querySelector('.rep-aud-veic').value.trim();
+                const ts = r.querySelector('.rep-aud-tp-sel').value;
+                const tc = r.querySelector('.rep-aud-tp-cus').value.trim();
+                const status = r.querySelector('.rep-aud-st').value;
+                const problema = r.querySelector('.rep-aud-prob').value.trim();
+                return veiculo ? { veiculo, tempo: (ts === 'outro' ? tc : ts) || '30 min', status, problema } : null;
+            }).filter(Boolean);
+
+            const prodNum = parseFloat(document.getElementById('rep_prodRealizada').value) || 0;
+            const nokNum = parseFloat(document.getElementById('rep_carrosNOK').value) || 0;
+
+            return {
+                data: dataGlobal,
+                objetivo: parseFloat(document.getElementById('rep_objetivo').value) || 0,
+                prodRealizadaStr: document.getElementById('rep_prodRealizada').value,
+                prodRealizadaNum: prodNum,
+                bolhas: parseFloat(document.getElementById('rep_bolhas').value) || 0,
+                carrosNOK: nokNum,
+                fttStr: rep_calcularFTT(prodNum, nokNum),
+                liberacaoOffline: parseFloat(document.getElementById('rep_liberacaoOffline').value) || 0,
+                reinspecao: parseFloat(document.getElementById('rep_reinspecao').value) || 0,
+                tratativas: parseFloat(document.getElementById('rep_tratativas').value) || 0,
+                top1_desc: document.getElementById('rep_top1_desc').value,
+                top1_qtd: document.getElementById('rep_top1_qtd').value,
+                top2_desc: document.getElementById('rep_top2_desc').value,
+                top2_qtd: document.getElementById('rep_top2_qtd').value,
+                top3_desc: document.getElementById('rep_top3_desc').value,
+                top3_qtd: document.getElementById('rep_top3_qtd').value,
+                ocorrencia: document.getElementById('rep_ocorrencia').value,
+                acao: document.getElementById('rep_acao').value,
+                auditoria: aud,
+                obs: Array.from(document.querySelectorAll('.rep-obs-in')).map(i => i.value).filter(Boolean)
+            };
+        }
+
+        function rep_carregarDadosDataLocal(dt) {
+            document.getElementById('rep_container-auditoria').innerHTML = '';
+            document.getElementById('rep_container-obs').innerHTML = '';
+            let reg = rep_cacheRegistros.find(r => r.data === dt);
+            if (!reg) {
+                try {
+                    const pend = JSON.parse(localStorage.getItem(REP_PENDENTES_KEY) || '[]');
+                    reg = pend.find(p => p.data === dt);
+                } catch (e) {}
+            }
+            if (!reg) {
+                ['rep_objetivo','rep_prodRealizada','rep_bolhas','rep_carrosNOK','rep_top1_desc','rep_top1_qtd','rep_top2_desc','rep_top2_qtd','rep_top3_desc','rep_top3_qtd','rep_ocorrencia','rep_acao'].forEach(id => document.getElementById(id).value = '');
+                ['rep_liberacaoOffline','rep_reinspecao','rep_tratativas'].forEach(id => document.getElementById(id).value = 0);
+                rep_adicionarCampoObs('Baixo volume na linha.');
+            } else {
+                document.getElementById('rep_objetivo').value = reg.objetivo ?? '';
+                document.getElementById('rep_prodRealizada').value = reg.prodRealizadaStr ?? '';
+                document.getElementById('rep_bolhas').value = reg.bolhas ?? '';
+                document.getElementById('rep_carrosNOK').value = reg.carrosNOK ?? '';
+                document.getElementById('rep_liberacaoOffline').value = reg.liberacaoOffline ?? 0;
+                document.getElementById('rep_reinspecao').value = reg.reinspecao ?? 0;
+                document.getElementById('rep_tratativas').value = reg.tratativas ?? 0;
+                document.getElementById('rep_top1_desc').value = reg.top1_desc ?? '';
+                document.getElementById('rep_top1_qtd').value = reg.top1_qtd ?? '';
+                document.getElementById('rep_top2_desc').value = reg.top2_desc ?? '';
+                document.getElementById('rep_top2_qtd').value = reg.top2_qtd ?? '';
+                document.getElementById('rep_top3_desc').value = reg.top3_desc ?? '';
+                document.getElementById('rep_top3_qtd').value = reg.top3_qtd ?? '';
+                document.getElementById('rep_ocorrencia').value = reg.ocorrencia ?? '';
+                document.getElementById('rep_acao').value = reg.acao ?? '';
+                if (reg.obs?.length) reg.obs.forEach(o => rep_adicionarCampoObs(o));
+            }
+            rep_aplicarTotaisAutomaticos(true);
+            rep_sincronizarAuditoriaDeVeiculos(true);
+            rep_atualizarPreview();
+        }
+
+        window.rep_salvarDadosDoDia = async function() {
+            if (!document.getElementById('rep_objetivo').value || !document.getElementById('rep_prodRealizada').value || document.getElementById('rep_bolhas').value === '' || document.getElementById('rep_carrosNOK').value === '') {
+                alert("⚠️ Preencha Objetivo, Produção Realizada, Bolhas e Carros NOK antes de salvar!");
+                return;
+            }
+            const dados = rep_extrairDados();
+            setBadgeStatus('status-rep', '● Produção: Salvando...', 'sync');
+            try {
+                await setDoc(doc(dbReport, REP_COLLECTION, dataGlobal), dados);
+                setBadgeStatus('status-rep', '● Produção: Sincronizado', 'ok');
+                exibirToast("✅ Produção Diária salva na nuvem!");
+            } catch (e) {
+                let pend = JSON.parse(localStorage.getItem(REP_PENDENTES_KEY) || '[]').filter(p => p.data !== dados.data);
+                pend.push(dados);
+                localStorage.setItem(REP_PENDENTES_KEY, JSON.stringify(pend));
+                setBadgeStatus('status-rep', '● Produção: Salvo Offline', 'off');
+                exibirToast("💾 Salvo offline no navegador!");
+            }
+        };
+
+        window.rep_limparTudo = async function() {
+            if (confirm(`Apagar dados da Produção Diária de ${formatarDataBR(dataGlobal)}?`)) {
+                await deleteDoc(doc(dbReport, REP_COLLECTION, dataGlobal));
+                rep_carregarDadosDataLocal(dataGlobal);
+                exibirToast("🗑️ Dados limpos!");
+            }
+        };
+
+        window.rep_gerarTextoWhatsApp = function() {
+            const d = rep_extrairDados();
+            const audTxt = d.auditoria.map(i => i.status === 'NOK' ? `• ${i.veiculo} (${i.tempo}) - NOK ❌ (${i.problema || 'Sem descrição'})` : `• ${i.veiculo} (${i.tempo}) - OK ✅`).join('\n');
             let cnt = 1;
-            const obs = d.obs.map(v => `• Obs ${cnt++}: ${v}`).join('\n');
-
-            let text = `📋 REPORT DIÁRIO INFILTRAÇÃO (${formatarDataBR(d.data)})
+            const obsTxt = d.obs.map(v => `• Obs ${cnt++}: ${v}`).join('\n');
+            let txt = `📋 PRODUÇÃO DIÁRIA INFILTRAÇÃO (${formatarDataBR(d.data)})
 
 🎯 Objetivo: ${d.objetivo}
 📊 Produção realizada: ${d.prodRealizadaStr}
 📈 FTT: ${d.fttStr}
 🫧 Bolhas: ${d.bolhas}
 ❌ Carros NOK: ${d.carrosNOK}
-📲 Liberação Offline: ${d.liberacaoOffline}
-🔄 Reinspeção: ${d.reinspecao}
+📲 OFFLINE DE INFILTRAÇÃO: ${d.liberacaoOffline}
+🔄 REINSPEÇÃO DE INFILTRAÇÃO / AUDITORIA: ${d.reinspecao}
 🛠️ Tratativas: ${d.tratativas}
 
 🚨 TOP 3 PROBLEMAS DETECTADOS
@@ -713,239 +1515,485 @@
 
 ⚠️ Ocorrência: ${d.ocorrencia}
 🔧 Ação: ${d.acao}`;
+            if (audTxt) txt += `\n\n🔍 Auditoria teste intensivo:\n${audTxt}`;
+            if (obsTxt) txt += `\n\n📝 Observações:\n${obsTxt}`;
+            return txt;
+        };
 
-            if (auditoriaText) text += `\n\n🔍 Auditoria teste intensivo:\n${auditoriaText}`;
-            if (obs) text += `\n\n📝 Observações:\n${obs}`;
-
-            return text;
-        }
-
-        function formatarDataBR(iso) {
-            if(!iso) return '';
-            const p = iso.split('-');
-            return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
-        }
-
-        async function limparTudo() {
-            if (confirm("Deseja apagar os dados desta data da nuvem e do aparelho?")) {
-                try {
-                    await db.collection(COLLECTION_NAME).doc(dataAtual).delete();
-                    
-                    // Remove também do armazenamento local se existir
-                    let pendentes = [];
-                    const pendentesStr = localStorage.getItem(STORAGE_KEY_PENDENTES);
-                    if (pendentesStr) {
-                        pendentes = JSON.parse(pendentesStr).filter(p => p.data !== dataAtual);
-                        localStorage.setItem(STORAGE_KEY_PENDENTES, JSON.stringify(pendentes));
-                    }
-
-                    carregarDadosDataLocal(dataAtual);
-                    exibirToast("🗑️ Dados limpos com sucesso!");
-                } catch(error) {
-                    console.error("Erro ao limpar:", error);
-                }
+        window.rep_atualizarPreview = function() {
+            const prodNum = parseFloat(document.getElementById('rep_prodRealizada')?.value) || 0;
+            const nokNum = parseFloat(document.getElementById('rep_carrosNOK')?.value) || 0;
+            const badge = document.getElementById('rep_ftt_badge');
+            if (badge) {
+                badge.innerText = `FTT: ${rep_calcularFTT(prodNum, nokNum)}`;
             }
-        }
+            document.getElementById('rep_preview').innerText = rep_gerarTextoWhatsApp();
+        };
 
-        function atualizarTabelaHistorico() {
-            const corpo = document.getElementById('tabela-historico-corpo');
-            const regs = cacheRegistros;
-            if (regs.length === 0) {
-                corpo.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Nenhum dado registrado na nuvem.</td></tr>`;
+        function rep_atualizarTabelaHistorico() {
+            const tb = document.getElementById('rep_tabela-historico');
+            if (!rep_cacheRegistros.length) {
+                tb.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-muted);">Nenhum registro na nuvem.</td></tr>`;
                 return;
             }
-            corpo.innerHTML = '';
-            regs.slice().reverse().forEach(r => {
-                const ftt = r.fttStr || calcularFTT(r.prodRealizadaNum, r.carrosNOK);
-                const trat = r.tratativas !== undefined ? r.tratativas : (r.reparos || 0);
-                corpo.innerHTML += `<tr>
+            tb.innerHTML = rep_cacheRegistros.slice().reverse().map(r => `
+                <tr>
                     <td><span class="badge-date">${formatarDataBR(r.data)}</span></td>
                     <td>${r.objetivo}</td>
                     <td><b>${r.prodRealizadaStr}</b></td>
-                    <td><b style="color:var(--accent-green)">${ftt}</b></td>
+                    <td><b style="color:var(--accent-green)">${r.fttStr || rep_calcularFTT(r.prodRealizadaNum, r.carrosNOK)}</b></td>
                     <td>${r.bolhas}</td>
                     <td>${r.carrosNOK}</td>
                     <td>${r.liberacaoOffline}</td>
-                    <td>${trat}</td>
-                </tr>`;
-            });
+                    <td>${r.reinspecao ?? 0}</td>
+                    <td>${r.tratativas ?? 0}</td>
+                </tr>
+            `).join('');
         }
 
-        function calcularEvolucaoPersonalizada() {
-            const regs = cacheRegistros;
-            const container = document.getElementById('kpi-container-metrics');
-            if (regs.length === 0) {
-                container.innerHTML = `<p style="color:var(--text-muted)">Sem dados suficientes para cálculo.</p>`;
-                return;
-            }
+        window.rep_mudarTipoFiltro = function() {
+            const t = document.getElementById('rep_tipoFiltro').value;
+            document.getElementById('rep_filtroDataUnica').style.display = (t === 'dia' || t === 'mes') ? 'inline-block' : 'none';
+            document.getElementById('rep_boxIntervalo').style.display = (t === 'personalizado') ? 'flex' : 'none';
+            rep_calcularEvolucao();
+        };
 
-            const tipo = document.getElementById('tipoFiltro').value;
-            let filtrados = [];
+        window.rep_calcularEvolucao = function() {
+            const c = document.getElementById('rep_kpi-metrics');
+            const t = document.getElementById('rep_tipoFiltro').value;
+            let filt = [];
             const hoje = new Date();
-
-            if (tipo === 'dia') {
-                const dt = document.getElementById('filtroDataUnica').value;
-                filtrados = regs.filter(r => r.data === dt);
-            } else if (tipo === 'semana') {
-                filtrados = regs.filter(r => {
-                    const dItem = new Date(r.data + 'T00:00:00');
-                    const diffTime = Math.abs(hoje - dItem);
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    return diffDays <= 7;
-                });
-            } else if (tipo === 'mes') {
-                const dt = document.getElementById('filtroDataUnica').value;
-                if (dt) {
-                    const [ano, mes] = dt.split('-');
-                    filtrados = regs.filter(r => r.data.startsWith(`${ano}-${mes}`));
-                }
-            } else if (tipo === 'personalizado') {
-                const ini = document.getElementById('filtroDataInicio').value;
-                const fim = document.getElementById('filtroDataFim').value;
-                if (ini && fim) {
-                    filtrados = regs.filter(r => r.data >= ini && r.data <= fim);
-                }
+            if (t === 'dia') filt = rep_cacheRegistros.filter(r => r.data === document.getElementById('rep_filtroDataUnica').value);
+            else if (t === 'semana') filt = rep_cacheRegistros.filter(r => Math.ceil(Math.abs(hoje - new Date(r.data + 'T00:00:00')) / 86400000) <= 7);
+            else if (t === 'mes') {
+                const am = (document.getElementById('rep_filtroDataUnica').value || obterDataHoje()).slice(0, 7);
+                filt = rep_cacheRegistros.filter(r => r.data.startsWith(am));
+            } else {
+                const ini = document.getElementById('rep_filtroDataInicio').value;
+                const fim = document.getElementById('rep_filtroDataFim').value;
+                filt = rep_cacheRegistros.filter(r => (!ini || r.data >= ini) && (!fim || r.data <= fim));
             }
-
-            let tProd = 0, tMeta = 0, tBolhas = 0, tNok = 0, tOff = 0, tTrat = 0;
-            filtrados.forEach(r => {
-                tProd += r.prodRealizadaNum || 0;
-                tMeta += r.objetivo || 0;
-                tBolhas += r.bolhas || 0;
-                tNok += r.carrosNOK || 0;
-                tOff += r.liberacaoOffline || 0;
-                tTrat += r.tratativas !== undefined ? r.tratativas : (r.reparos || 0);
-            });
-
-            const fttGeral = calcularFTT(tProd, tNok);
-
-            container.innerHTML = `
-                <div class="kpi-card" style="border-left-color: var(--accent-blue)">
-                    <h4>📊 Volume Total Produzido</h4>
-                    <div class="val">${tProd} carros</div>
-                </div>
-                <div class="kpi-card" style="border-left-color: var(--accent-amber)">
-                    <h4>🎯 Meta Total (Objetivo)</h4>
-                    <div class="val">${tMeta} carros</div>
-                </div>
-                <div class="kpi-card" style="border-left-color: var(--accent-green)">
-                    <h4>📈 FTT Médio Período</h4>
-                    <div class="val">${fttGeral}</div>
-                </div>
-                <div class="kpi-card" style="border-left-color: #ef4444">
-                    <h4>🫧 Total Bolhas</h4>
-                    <div class="val">${tBolhas} Bolhas</div>
-                </div>
-                <div class="kpi-card" style="border-left-color: #dc2626">
-                    <h4>❌ Total Carros NOK</h4>
-                    <div class="val">${tNok} NOK</div>
-                </div>
-                <div class="kpi-card" style="border-left-color: #3b82f6">
-                    <h4>📲 Total Lib. Offline</h4>
-                    <div class="val">${tOff} Off</div>
-                </div>
-                <div class="kpi-card" style="border-left-color: #8b5cf6">
-                    <h4>🛠️ Total Tratativas</h4>
-                    <div class="val">${tTrat} Tratativas</div>
-                </div>
+            let prod = 0, meta = 0, bolhas = 0, nok = 0, off = 0, reinsp = 0, trat = 0;
+            filt.forEach(r => { prod += r.prodRealizadaNum || 0; meta += r.objetivo || 0; bolhas += r.bolhas || 0; nok += r.carrosNOK || 0; off += r.liberacaoOffline || 0; reinsp += r.reinspecao || 0; trat += r.tratativas || 0; });
+            c.innerHTML = `
+                <div class="kpi-card"><h3>📊 Produzido</h3><p>${prod}</p></div>
+                <div class="kpi-card" style="border-bottom-color:var(--accent-amber);"><h3>🎯 Meta</h3><p>${meta}</p></div>
+                <div class="kpi-card" style="border-bottom-color:var(--accent-green);"><h3>📈 FTT Médio</h3><p>${rep_calcularFTT(prod, nok)}</p></div>
+                <div class="kpi-card" style="border-bottom-color:var(--accent-red);"><h3>🫧 Bolhas</h3><p>${bolhas}</p></div>
+                <div class="kpi-card" style="border-bottom-color:var(--accent-red);"><h3>❌ NOK</h3><p>${nok}</p></div>
+                <div class="kpi-card"><h3>📲 Offline de Infiltração</h3><p>${off}</p></div>
+                <div class="kpi-card" style="border-bottom-color:var(--accent-blue);"><h3>🔄 Reinspeção / Auditoria</h3><p>${reinsp}</p></div>
+                <div class="kpi-card" style="border-bottom-color:var(--accent-purple);"><h3>🛠️ Tratativas</h3><p>${trat}</p></div>
             `;
-        }
+        };
 
-        function exportarExcel() {
-            const regs = cacheRegistros;
-            if(regs.length === 0) { alert("Não há dados para exportar."); return; }
-            
-            const dadosPlanilha = regs.map(r => ({
+        window.rep_exportarExcel = function() {
+            if (!rep_cacheRegistros.length) { alert("Sem dados para exportar."); return; }
+            const rows = rep_cacheRegistros.map(r => ({
                 "Data": formatarDataBR(r.data),
                 "Objetivo (Meta)": r.objetivo,
                 "Produção Realizada": r.prodRealizadaStr,
-                "FTT (%)": r.fttStr || calcularFTT(r.prodRealizadaNum, r.carrosNOK),
+                "FTT (%)": r.fttStr || rep_calcularFTT(r.prodRealizadaNum, r.carrosNOK),
                 "Bolhas": r.bolhas,
                 "Carros NOK": r.carrosNOK,
-                "Liberação Offline": r.liberacaoOffline,
-                "Reinspeção": r.reinspecao,
-                "Tratativas": r.tratativas !== undefined ? r.tratativas : (r.reparos || 0)
+                "OFFLINE DE INFILTRAÇÃO": r.liberacaoOffline,
+                "REINSPEÇÃO DE INFILTRAÇÃO / AUDITORIA": r.reinspecao ?? 0,
+                "Tratativas": r.tratativas ?? 0
             }));
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Producao Infiltracao");
+            XLSX.writeFile(wb, "producao_diaria_infiltracao.xlsx");
+        };
 
-            const worksheet = XLSX.utils.json_to_sheet(dadosPlanilha);
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Evolucao Infiltracao");
-            XLSX.writeFile(workbook, "report_infiltracao_evolucao.xlsx");
-        }
-
-        async function importarExcel(event) {
+        window.rep_importarExcel = function(event) {
             const file = event.target.files[0];
-            if(!file) return;
-
+            if (!file) return;
             const reader = new FileReader();
             reader.onload = async function(e) {
                 try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, {type: 'array'});
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    const json = XLSX.utils.sheet_to_json(worksheet);
-
-                    for (let row of json) {
+                    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                    for (const row of rows) {
                         let dt = row["Data"];
                         if (dt) {
-                            if (dt.includes('/')) {
-                                const partes = dt.split('/');
-                                if (partes.length === 3) {
-                                    dt = `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`;
-                                }
+                            if (typeof dt === 'string' && dt.includes('/')) {
+                                const p = dt.split('/');
+                                if (p.length === 3) dt = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
                             }
-
-                            const prodNum = parseFloat(row["Produção Realizada"]) || 0;
-                            const nokNum = parseFloat(row["Carros NOK"]) || 0;
-
-                            const objFormatado = {
-                                data: dt,
-                                objetivo: row["Objetivo (Meta)"] || 430,
-                                prodRealizadaStr: String(row["Produção Realizada"] || "0"),
-                                prodRealizadaNum: prodNum,
-                                bolhas: row["Bolhas"] || 0,
-                                carrosNOK: nokNum,
-                                fttStr: calcularFTT(prodNum, nokNum),
-                                liberacaoOffline: row["Liberação Offline"] || 0,
-                                reinspecao: row["Reinspeção"] || 0,
-                                tratativas: row["Tratativas"] !== undefined ? row["Tratativas"] : (row["Reparos"] || 0),
-                                top1_desc: "", top1_qtd: "",
-                                top2_desc: "", top2_qtd: "",
-                                top3_desc: "", top3_qtd: "",
-                                ocorrencia: "",
-                                acao: "",
-                                auditoria: [], obs: []
-                            };
-                            await db.collection(COLLECTION_NAME).doc(dt).set(objFormatado);
+                            const prod = parseFloat(row["Produção Realizada"]) || 0;
+                            const nok = parseFloat(row["Carros NOK"]) || 0;
+                            await setDoc(doc(dbReport, REP_COLLECTION, dt), {
+                                data: dt, objetivo: row["Objetivo (Meta)"] || 430,
+                                prodRealizadaStr: String(row["Produção Realizada"] || "0"), prodRealizadaNum: prod,
+                                bolhas: row["Bolhas"] || 0, carrosNOK: nok, fttStr: rep_calcularFTT(prod, nok),
+                                liberacaoOffline: row["OFFLINE DE INFILTRAÇÃO"] ?? row["Liberação Offline"] ?? 0,
+                                reinspecao: row["REINSPEÇÃO DE INFILTRAÇÃO / AUDITORIA"] ?? row["Reinspeção"] ?? 0,
+                                tratativas: row["Tratativas"] ?? 0,
+                                top1_desc: "", top1_qtd: "", top2_desc: "", top2_qtd: "", top3_desc: "", top3_qtd: "",
+                                ocorrencia: "", acao: "", auditoria: [], obs: []
+                            });
                         }
                     }
-
-                    alert("Planilha importada e sincronizada com o Firebase com sucesso!");
-                } catch(err) {
-                    alert("Erro ao ler o arquivo Excel. Verifique o formato.");
-                    console.error(err);
-                }
+                    exibirToast("✅ Planilha importada para Produção Diária!");
+                } catch (err) { alert("Erro ao importar planilha."); }
+                event.target.value = "";
             };
             reader.readAsArrayBuffer(file);
+        };
+
+        // ==================================================================
+        // MÓDULO 3: REINSPEÇÃO DE INFILTRAÇÃO / AUDITORIA
+        // ==================================================================
+        const off_camposIDs = ['turno', 'eqe_ok', 'eqe_nok', 'song_sa2_ok', 'song_sa2_nok', 'king_ok', 'king_nok', 'song_sa6_ok', 'song_sa6_nok', 'sc3h_ok', 'sc3h_nok', 'sc3e_ok', 'sc3e_nok', 'ini_reparo', 'ini_reinspecao', 'ini_estrada', 'ini_eletrica', 'fin_reparo', 'fin_reinspecao', 'fin_estrada', 'fin_eletrica'];
+        let off_cacheGlobal = {};
+        let off_isRecebendo = false;
+
+        onSnapshot(collection(dbReparo, "reparos_offline"), (snap) => {
+            off_cacheGlobal = {};
+            snap.forEach(d => { off_cacheGlobal[d.id] = d.data(); });
+            if (!off_isRecebendo && Date.now() - off_ultimaAlteracaoLocal > 2500) {
+                const activeEl = document.activeElement;
+                const insideOffAud = activeEl && activeEl.closest('#off_container-auditoria');
+                if (!insideOffAud) {
+                    off_preencherFormulario(off_cacheGlobal[dataGlobal] || null);
+                }
+            }
+            off_atualizarTabelaHistorico();
+            off_calcularEvolucao();
+            rep_aplicarTotaisAutomaticos(true);
+            setBadgeStatus('status-off', '● Reinspeção/Auditoria: Sincronizado', 'ok');
+        }, () => setBadgeStatus('status-off', '● Reinspeção/Auditoria: Desconectado', 'off'));
+
+        window.off_trocarAba = function(aba, btn) {
+            ['editor', 'historico', 'evolucao'].forEach(id => {
+                document.getElementById('off-tab-' + id).style.display = (id === aba) ? (id === 'editor' ? 'grid' : 'block') : 'none';
+            });
+            btn.parentElement.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            if (aba === 'historico') off_atualizarTabelaHistorico();
+            if (aba === 'evolucao') off_calcularEvolucao();
+        };
+
+        window.off_adicionarCampoAuditoria = function(item = null, carregando = false) {
+            const c = document.getElementById('off_container-auditoria');
+            const row = document.createElement('div');
+            row.className = 'dynamic-row-card';
+            const mod = item?.modelo || '';
+            const ch = item?.chassi || '';
+            const tp = item?.tempo || '';
+            const st = item?.status || 'OK';
+            const mot = item?.motivo || '';
+
+            row.innerHTML = `
+                <select class="off-aud-mod">
+                    <option value="" disabled ${!mod?'selected':''}>Modelo</option>
+                    ${['SA2','SA6','HA2','EQE','EQE PBP','SC3H','SC3H PBP','SC3E'].map(m => `<option value="${m}" ${mod===m?'selected':''}>${m}</option>`).join('')}
+                </select>
+                <input type="text" class="off-aud-ch" value="${ch}" placeholder="VIN">
+                <select class="off-aud-tp">
+                    <option value="" disabled ${!tp?'selected':''}>Tempo</option>
+                    ${['5 min','10 min','15 min','20 min','30 min','40 min','50 min','60 min'].map(t => `<option value="${t}" ${tp===t?'selected':''}>${t}</option>`).join('')}
+                </select>
+                <select class="off-aud-st">
+                    <option value="OK" ${st==='OK'?'selected':''}>OK</option>
+                    <option value="NOK" ${st==='NOK'?'selected':''}>NOK</option>
+                </select>
+                <button type="button" class="btn-tool btn-red" style="height:38px;justify-content:center;" onclick="this.closest('.dynamic-row-card').remove(); off_processar()">✕</button>
+                <div class="dynamic-row-nok-box" style="display:${st==='NOK'?'block':'none'};">
+                    <input type="text" class="off-aud-mot" value="${mot}" placeholder="Informe o motivo do NOK...">
+                </div>
+            `;
+
+            row.querySelector('.off-aud-st').addEventListener('change', (e) => {
+                const box = row.querySelector('.dynamic-row-nok-box');
+                box.style.display = e.target.value === 'NOK' ? 'block' : 'none';
+                if (e.target.value !== 'NOK') row.querySelector('.off-aud-mot').value = '';
+                off_processar();
+            });
+
+            row.querySelectorAll('input, select').forEach(el => {
+                if (!el.classList.contains('off-aud-st')) {
+                    el.addEventListener('input', () => off_aoEditarCampo());
+                    el.addEventListener('change', () => off_processar());
+                    el.addEventListener('blur', () => off_salvarMemoriaSilenciosa());
+                }
+            });
+
+            c.appendChild(row);
+            if (!carregando) {
+                off_aoEditarCampo();
+                if (!item) {
+                    row.querySelector('.off-aud-ch').focus();
+                }
+            }
+        };
+
+        function off_extrairDados() {
+            const dados = {};
+            off_camposIDs.forEach(id => { dados[id] = document.getElementById('off_' + id).value; });
+            dados.auditoriaObjs = Array.from(document.querySelectorAll('#off_container-auditoria .dynamic-row-card')).map(card => ({
+                modelo: card.querySelector('.off-aud-mod').value,
+                chassi: card.querySelector('.off-aud-ch').value.trim(),
+                tempo: card.querySelector('.off-aud-tp').value,
+                status: card.querySelector('.off-aud-st').value,
+                motivo: card.querySelector('.off-aud-mot').value.trim()
+            }));
+            return dados;
         }
 
-        function copiarTexto() {
-            navigator.clipboard.writeText(gerarTextoWhatsApp()).then(() => exibirToast("Texto copiado com sucesso!"));
+        function off_salvarLocalEAtualizarResumo() {
+            if (!dataGlobal) return;
+            off_ultimaAlteracaoLocal = Date.now();
+            const dados = off_extrairDados();
+            off_cacheGlobal[dataGlobal] = { ...dados, atualizadoEm: new Date().toISOString() };
+            localStorage.setItem(`app_reparo_offline_${dataGlobal}`, JSON.stringify(dados));
+            document.getElementById('off_preview').innerText = off_gerarTextoWhatsApp();
+            rep_aplicarTotaisAutomaticos(true);
+            rep_sincronizarAuditoriaDeVeiculos(true);
         }
 
-        function exibirToast(msg = "Operação realizada com sucesso!") {
-            const toast = document.getElementById('toast');
-            toast.innerText = msg;
-            toast.style.display = 'block';
-            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        async function off_salvarMemoriaSilenciosa() {
+            if (!dataGlobal) return;
+            off_salvarLocalEAtualizarResumo();
+            const dados = off_extrairDados();
+            setBadgeStatus('status-off', '● Reinspeção/Auditoria: Salvando...', 'sync');
+            try {
+                await setDoc(doc(dbReparo, "reparos_offline", dataGlobal), { ...dados, atualizadoEm: new Date().toISOString() });
+                setBadgeStatus('status-off', '● Reinspeção/Auditoria: Sincronizado', 'ok');
+            } catch (e) {
+                setBadgeStatus('status-off', '● Reinspeção/Auditoria: Salvo Local', 'off');
+            }
         }
 
-        function enviarWhatsApp() {
-            window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(gerarTextoWhatsApp()), '_blank');
+        window.off_aoEditarCampo = function() {
+            if (off_isRecebendo) return;
+            off_salvarLocalEAtualizarResumo();
+            clearTimeout(off_syncTimer);
+            off_syncTimer = setTimeout(() => {
+                off_salvarMemoriaSilenciosa();
+            }, 900);
+        };
+
+        window.off_salvarManualmente = function() {
+            clearTimeout(off_syncTimer);
+            off_salvarMemoriaSilenciosa();
+            exibirToast(`✅ Reinspeção de Infiltração / Auditoria de ${formatarDataBR(dataGlobal)} salva!`);
+        };
+
+        function off_preencherFormulario(d) {
+            document.getElementById('off_container-auditoria').innerHTML = '';
+            if (!d) {
+                off_camposIDs.forEach(id => { if (id !== 'turno') document.getElementById('off_' + id).value = 0; });
+                document.getElementById('off_preview').innerText = off_gerarTextoWhatsApp();
+                return;
+            }
+            off_camposIDs.forEach(id => { if (d[id] !== undefined) document.getElementById('off_' + id).value = d[id]; });
+            const objs = d.auditoriaObjs || d.auditoria30Objs || [];
+            objs.forEach(item => off_adicionarCampoAuditoria(item, true));
+            document.getElementById('off_preview').innerText = off_gerarTextoWhatsApp();
         }
 
-        window.onload = inicializarApp;
+        window.off_trocarData = function() {
+            off_isRecebendo = true;
+            if (off_cacheGlobal[dataGlobal]) off_preencherFormulario(off_cacheGlobal[dataGlobal]);
+            else {
+                const loc = localStorage.getItem(`app_reparo_offline_${dataGlobal}`);
+                off_preencherFormulario(loc ? JSON.parse(loc) : null);
+            }
+            setTimeout(() => { off_isRecebendo = false; }, 200);
+        };
+
+        window.off_processar = function() {
+            if (off_isRecebendo) return;
+            clearTimeout(off_syncTimer);
+            off_salvarMemoriaSilenciosa();
+        };
+
+        window.off_limparTudo = async function() {
+            if (confirm(`Zerar os dados de Reinspeção de Infiltração / Auditoria de ${formatarDataBR(dataGlobal)}?`)) {
+                off_ultimaAlteracaoLocal = Date.now();
+                delete off_cacheGlobal[dataGlobal];
+                localStorage.removeItem(`app_reparo_offline_${dataGlobal}`);
+                try {
+                    await deleteDoc(doc(dbReparo, "reparos_offline", dataGlobal));
+                } catch (e) {}
+                off_preencherFormulario(null);
+                rep_aplicarTotaisAutomaticos(true);
+                rep_sincronizarAuditoriaDeVeiculos(true);
+                exibirToast("🗑️ Dados zerados!");
+            }
+        };
+
+        function off_getVal(id) { const v = parseInt(document.getElementById('off_' + id).value); return isNaN(v) ? 0 : v; }
+
+        function off_totaisFormularioAtual() {
+            let ok = off_getVal('eqe_ok') + off_getVal('song_sa2_ok') + off_getVal('king_ok') + off_getVal('song_sa6_ok') + off_getVal('sc3h_ok') + off_getVal('sc3e_ok');
+            let nok = off_getVal('eqe_nok') + off_getVal('song_sa2_nok') + off_getVal('king_nok') + off_getVal('song_sa6_nok') + off_getVal('sc3h_nok') + off_getVal('sc3e_nok');
+            document.querySelectorAll('#off_container-auditoria .dynamic-row-card').forEach(card => {
+                const st = card.querySelector('.off-aud-st').value;
+                if (st === 'OK') ok++; else if (st === 'NOK') nok++;
+            });
+            return { ok, nok };
+        }
+
+        window.off_gerarTextoWhatsApp = function() {
+            const turno = document.getElementById('off_turno').value;
+            let { ok, nok } = off_totaisFormularioAtual();
+            let audArr = [];
+            document.querySelectorAll('#off_container-auditoria .dynamic-row-card').forEach(card => {
+                const mod = card.querySelector('.off-aud-mod').value;
+                const ch = card.querySelector('.off-aud-ch').value.trim();
+                const tp = card.querySelector('.off-aud-tp').value;
+                const st = card.querySelector('.off-aud-st').value;
+                const mot = card.querySelector('.off-aud-mot').value.trim();
+                if (ch) audArr.push(`• ${mod ? mod + ':' : ''}${ch} - ${tp || '30 min'} - ${st}${st === 'NOK' && mot ? ` (${mot})` : ''}`);
+            });
+            document.getElementById('off_total-text').innerText = `✅ ${ok} | ❌ ${nok}`;
+            let txt = `➡️ REINSPEÇÃO DE INFILTRAÇÃO / AUDITORIA
+📅 ${formatarDataBR(dataGlobal)} | ${turno}
+
+📋 REINSPEÇÃO DE INFILTRAÇÃO / AUDITORIA PADRÃO
+• EQE (Dolphin): ✅ ${off_getVal('eqe_ok')} | ❌ ${off_getVal('eqe_nok')}
+• SONG (SA2): ✅ ${off_getVal('song_sa2_ok')} | ❌ ${off_getVal('song_sa2_nok')}
+• KING (HA2): ✅ ${off_getVal('king_ok')} | ❌ ${off_getVal('king_nok')}
+• SONG (SA6): ✅ ${off_getVal('song_sa6_ok')} | ❌ ${off_getVal('song_sa6_nok')}
+• SC3H (Atto): ✅ ${off_getVal('sc3h_ok')} | ❌ ${off_getVal('sc3h_nok')}
+• SC3E (Yuan): ✅ ${off_getVal('sc3e_ok')} | ❌ ${off_getVal('sc3e_nok')}
+
+📊 TOTAL: ✅ ${ok} | ❌ ${nok}`;
+            if (audArr.length) txt += `\n\n🔎 AUDITORIA DE VEÍCULOS:\n${audArr.join('\n')}`;
+            txt += `\n\n🔋 INÍCIO DO TURNO
+• Reparo: ${off_getVal('ini_reparo')} | Reinspeção de Infiltração / Auditoria: ${off_getVal('ini_reinspecao')} | Estrada: ${off_getVal('ini_estrada')} | Elétrica: ${off_getVal('ini_eletrica')}
+
+🪫 FINAL DO TURNO
+• Reparo: ${off_getVal('fin_reparo')} | Reinspeção de Infiltração / Auditoria: ${off_getVal('fin_reinspecao')} | Estrada: ${off_getVal('fin_estrada')} | Elétrica: ${off_getVal('fin_eletrica')}`;
+            return txt;
+        };
+
+        function off_totaisRegistro(r) {
+            let ok = (parseInt(r.eqe_ok)||0)+(parseInt(r.song_sa2_ok)||0)+(parseInt(r.king_ok)||0)+(parseInt(r.song_sa6_ok)||0)+(parseInt(r.sc3h_ok)||0)+(parseInt(r.sc3e_ok)||0);
+            let nok = (parseInt(r.eqe_nok)||0)+(parseInt(r.song_sa2_nok)||0)+(parseInt(r.king_nok)||0)+(parseInt(r.song_sa6_nok)||0)+(parseInt(r.sc3h_nok)||0)+(parseInt(r.sc3e_nok)||0);
+            (r.auditoriaObjs || r.auditoria30Objs || []).forEach(i => { if (i.status === 'OK') ok++; else if (i.status === 'NOK') nok++; });
+            return { ok, nok };
+        }
+
+        function off_atualizarTabelaHistorico() {
+            const tb = document.getElementById('off_tabela-historico');
+            const keys = Object.keys(off_cacheGlobal).sort().reverse();
+            if (!keys.length) { tb.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Nenhum dado registrado.</td></tr>`; return; }
+            tb.innerHTML = keys.map(dt => {
+                const r = off_cacheGlobal[dt];
+                const t = off_totaisRegistro(r);
+                return `<tr><td><span class="badge-date">${formatarDataBR(dt)}</span></td><td><b>${r.turno || 'TURNO A'}</b></td><td>✅ ${t.ok}</td><td>❌ ${t.nok}</td><td><b>${t.ok + t.nok}</b></td></tr>`;
+            }).join('');
+        }
+
+        window.off_mudarTipoFiltro = function() {
+            const t = document.getElementById('off_tipoFiltro').value;
+            document.getElementById('off_filtroDataUnica').style.display = (t === 'dia' || t === 'mes') ? 'inline-block' : 'none';
+            document.getElementById('off_boxIntervalo').style.display = (t === 'personalizado') ? 'flex' : 'none';
+            off_calcularEvolucao();
+        };
+
+        window.off_calcularEvolucao = function() {
+            const c = document.getElementById('off_kpi-metrics');
+            const keys = Object.keys(off_cacheGlobal);
+            const t = document.getElementById('off_tipoFiltro').value;
+            let filt = [];
+            const hoje = new Date();
+            if (t === 'dia') { const dt = document.getElementById('off_filtroDataUnica').value; if (off_cacheGlobal[dt]) filt.push(off_cacheGlobal[dt]); }
+            else if (t === 'semana') keys.forEach(dt => { if (Math.ceil(Math.abs(hoje - new Date(dt+'T00:00:00')) / 86400000) <= 7) filt.push(off_cacheGlobal[dt]); });
+            else if (t === 'mes') { const am = (document.getElementById('off_filtroDataUnica').value || obterDataHoje()).slice(0,7); keys.forEach(dt => { if (dt.startsWith(am)) filt.push(off_cacheGlobal[dt]); }); }
+            else if (t === 'personalizado') { const ini = document.getElementById('off_filtroDataInicio').value, fim = document.getElementById('off_filtroDataFim').value; keys.forEach(dt => { if ((!ini || dt >= ini) && (!fim || dt <= fim)) filt.push(off_cacheGlobal[dt]); }); }
+            else keys.forEach(dt => filt.push(off_cacheGlobal[dt]));
+
+            let ok = 0, nok = 0;
+            filt.forEach(r => { const tot = off_totaisRegistro(r); ok += tot.ok; nok += tot.nok; });
+            c.innerHTML = `
+                <div class="kpi-card" style="border-bottom-color:var(--accent-green);"><h3>✅ Total OK</h3><p>${ok}</p></div>
+                <div class="kpi-card" style="border-bottom-color:var(--accent-red);"><h3>❌ Total NOK</h3><p>${nok}</p></div>
+                <div class="kpi-card" style="border-bottom-color:var(--accent-purple);"><h3>📊 Total Reinspeção / Auditoria</h3><p>${ok + nok} itens</p></div>
+            `;
+        };
+
+        window.off_abrirModalExportacao = function() {
+            modoExportacaoAtual = 'REPARO';
+            document.getElementById('modalExportTitle').innerText = '📊 Exportar Reinspeção de Infiltração / Auditoria (.xlsx)';
+            document.getElementById('modalExport').style.display = 'flex';
+        };
+
+        // ==================================================================
+        // MODAL UNIFICADO DE EXPORTAÇÃO EXCEL
+        // ==================================================================
+        window.confirmarExportacaoModal = function() {
+            const opc = document.getElementById('exportPeriodoOpcao').value;
+            const hoje = new Date();
+            const dtIni = document.getElementById('exportDataInicio').value;
+            const dtFim = document.getElementById('exportDataFim').value;
+
+            const filtrarChaves = (todasChaves) => {
+                if (opc === 'DIA_SELECIONADO') return [dataGlobal];
+                if (opc === 'HOJE') return [obterDataHoje()];
+                if (opc === 'MES_ATUAL') {
+                    const am = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+                    return todasChaves.filter(d => d.startsWith(am));
+                }
+                if (opc === 'MES_ANTERIOR') {
+                    let m = hoje.getMonth(), a = hoje.getFullYear();
+                    if (m === 0) { m = 12; a--; }
+                    const am = `${a}-${String(m).padStart(2, '0')}`;
+                    return todasChaves.filter(d => d.startsWith(am));
+                }
+                if (opc === 'INTERVALO') return todasChaves.filter(d => (!dtIni || d >= dtIni) && (!dtFim || d <= dtFim));
+                return todasChaves;
+            };
+
+            if (modoExportacaoAtual === 'NC') {
+                const chaves = filtrarChaves(Object.keys(nc_historicoGeral).sort());
+                let lista = [];
+                chaves.forEach(dt => {
+                    (nc_historicoGeral[dt] || []).forEach(i => {
+                        lista.push({ Data: formatarDataBR(dt), Modelo: i.modelo, Chassi: i.chassi, Local: i.local, "Não Conformidade": i.nc, Tratativa: i.tratativa });
+                    });
+                });
+                if (!lista.length) { alert("Nenhum lançamento encontrado no período."); return; }
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lista), "Offline de Infiltracao");
+                XLSX.writeFile(wb, `Offline_de_Infiltracao_${opc}.xlsx`);
+            } else {
+                const chaves = filtrarChaves(Object.keys(off_cacheGlobal).sort());
+                let lista = [];
+                chaves.forEach(dt => {
+                    const r = off_cacheGlobal[dt];
+                    if (r) {
+                        let base = {
+                            Data: formatarDataBR(dt), Turno: r.turno || "TURNO A",
+                            "Início Reparo": r.ini_reparo || 0, "Início Reinspeção / Auditoria": r.ini_reinspecao || 0, "Início Estrada": r.ini_estrada || 0, "Início Elétrica": r.ini_eletrica || 0,
+                            "Fim Reparo": r.fin_reparo || 0, "Fim Reinspeção / Auditoria": r.fin_reinspecao || 0, "Fim Estrada": r.fin_estrada || 0, "Fim Elétrica": r.fin_eletrica || 0,
+                            "EQE OK": r.eqe_ok || 0, "EQE NOK": r.eqe_nok || 0, "SA2 OK": r.song_sa2_ok || 0, "SA2 NOK": r.song_sa2_nok || 0,
+                            "HA2 OK": r.king_ok || 0, "HA2 NOK": r.king_nok || 0, "SA6 OK": r.song_sa6_ok || 0, "SA6 NOK": r.song_sa6_nok || 0,
+                            "SC3H OK": r.sc3h_ok || 0, "SC3H NOK": r.sc3h_nok || 0, "SC3E OK": r.sc3e_ok || 0, "SC3E NOK": r.sc3e_nok || 0
+                        };
+                        (r.auditoriaObjs || r.auditoria30Objs || []).forEach((it, idx) => {
+                            base[`Auditoria ${idx+1}`] = `${it.modelo||''} - ${it.chassi} - ${it.tempo||''} - ${it.status}${it.motivo ? ' ('+it.motivo+')' : ''}`;
+                        });
+                        lista.push(base);
+                    }
+                });
+                if (!lista.length) { alert("Nenhum lançamento encontrado no período."); return; }
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lista), "Reinspecao Auditoria");
+                XLSX.writeFile(wb, `Reinspecao_Infiltracao_Auditoria_${opc}.xlsx`);
+            }
+            document.getElementById('modalExport').style.display = 'none';
+        };
+
+        // INICIALIZAÇÃO
+        const hojeInicial = obterDataHoje();
+        document.getElementById('globalData').value = hojeInicial;
+        document.getElementById('rep_filtroDataUnica').value = hojeInicial;
+        document.getElementById('off_filtroDataUnica').value = hojeInicial;
+        sincronizarDataGlobal(hojeInicial);
     </script>
 </body>
 </html>
